@@ -1,0 +1,115 @@
+# A '#' represents a comment and everything after it is skipped
+# Lines starting with # or blank lines are skipped
+# One line for each setting, no multiple settings on same line, line indentation does not matter
+# Blocks with =[] define LISTS (arrays)
+# Blocks with ={} define MAPS (hashmaps)
+# Blocks with =[{}] define ORDEREDMAPS (array of hashmaps)
+# Blocks with = or nothing define VALUES (single value)
+# A key and/or value can be quoted (with ", ' or `, quotes) or unquoted
+# Lines with one or multiple '@'s define the end of that many previous blocks
+
+
+##
+##  relative paths are relative to this current configuration file
+##
+
+tasks =[{}]
+
+    task1 ={}
+        # bundle any external dependencies in the built package (list)
+        bundle =[]
+            
+            ./deps/dependency1.js
+            ./deps/dependency2.js
+
+        @ # end block
+
+
+        # The input files (list)
+        src =[] # a comment
+            
+            !tpl:umd-header.tpl.js  # include a umd-header template
+            ../src/file1.js# a comment
+            ../src/file2.js
+            !tpl:umd-footer.tpl.js  # include a umd-footer template
+
+            @ # block end
+
+            
+        # The file to extract the header (else first file in @SRC list is used)
+        header = ../src/file1.js
+
+
+        # Any texts to be replaced in the final file (ordered map)
+        replace =[{}] # a comment
+            "a" = "b"
+            "c" = "d" # a comment
+        @ # block end
+
+
+        # allow some pre-process to take place
+        preprocess =[]
+        @ # block end
+
+
+        # Extract documentation from the source (map)
+        doc ={} # a comment
+            # start of documentation block
+            "startdoc" = "/**[DOC_MARKUP]" # a comment
+            
+            # end of documentation block
+            "enddoc" = "[/DOC_MARKUP]**/" # a comment
+            
+            # remove this string from the the start of each doc line
+            "trim" = "* "
+            
+            # or use a regular expression to trim the start part of each line
+            "trimx" = "\\s*\\*"
+            
+            # separator between each doc block in the output file (default is 2 lines)
+            "separator" = "\n\n=====================================================\n\n"
+            
+            # documentation output file
+            "output" = "../doc/manual.md"
+        @ # block end
+
+
+        # Minify the Package (map of lists)
+        minify ={}
+
+            # Options for Node UglifyJS Compiler (if used, default), (mangle and compress)
+            "uglifyjs" =[]
+                -m -c
+            @ # block end
+
+            # Options for Java Closure Compiler (if used)
+            "closure" =[] 
+                --language_in=ECMASCRIPT5_STRICT
+            @ # block end
+
+            # Options for Java YUI Compressor Compiler (if used)
+            "yui" =[]
+                --preserve-semi
+            @ # block end
+
+            # Options for CSS Minifier, if the files are .css
+            "cssmin" =[]
+                --embed-images
+                #--embed-fonts
+            @ # block end
+
+        @ # block end
+
+
+
+        # allow some post-process to take place
+        postprocess =[]
+        @ # block end
+
+
+        # The final output file (value)
+        out =  ../build/package_output.min.js
+    
+    @ # block end
+
+@ # block end

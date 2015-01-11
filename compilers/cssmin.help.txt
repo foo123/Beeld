@@ -1,0 +1,41 @@
+CSSMin (php, python, js)
+====================
+
+v. 0.6
+---------
+
+Running each tool/compiler in the command-line without any options,
+will print a help screen about how to use
+
+
+Options for cssmin tool(s) (eg. for js)
+=========================================
+
+usage: cssmin.js [-h] [--no-minify] [--remove-comments] [--vendor-prefixes] [--apply-polyfills] [--hsla2rgba] [--rgb2hex] [--embed-images] [--embed-fonts] [--embed-imports] [--basepath=PATH] [--input=FILE] [--output=FILE]
+
+Process and Minify CSS Files (v. 0.6)
+
+optional arguments:
+  -h, --help              show this help message and exit
+  --input=FILE            input file (REQUIRED)
+  --output=FILE           output file (OPTIONAL)
+  --vendor-prefixes       whether to add/fix vendor prefixes in css (default false)
+  --apply-polyfills       whether to apply fallback polyfills (eg for gradients) in css (default false)
+  --hsla2rgba             whether to convert hsl(a) colors to rgb(a) colors (default false)
+  --rgb2hex               whether to convert rgb colors to hex colors (default false)
+  --embed-images          whether to embed images in the css (default false)
+  --embed-fonts           whether to embed fonts in the css (default false)
+  --embed-imports         TODO, whether to embed css files added with @import (default false)
+  --remove-comments       whether to remove css comments (default false)
+  --no-minify             whether to bypass minification of the css (default false)
+  --basepath=PATH         file base path (OPTIONAL)
+
+  
+  
+basepath is used mostly in combination with other tools, 
+to set the basepath where images/fonts/imported css files are relative to
+
+else the current input file's basepath is used to compute the relative paths of images and fonts 
+if "embed-images" or "embed-fonts" flags are set respectively
+
+cssmin.py --remove-comments --vendor-prefixes --apply-polyfills --hsla2rgba --rgb2hex --input=test.css --output=testpy.css

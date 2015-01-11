@@ -1,0 +1,75 @@
+##
+##  relative paths are relative to this current configuration file
+##
+
+"tasks":
+    - "task1" :
+        # bundle any external dependencies in the built package
+        "bundle" :
+            - "./deps/dependency1.js"
+            - "./deps/dependency2.js"
+
+
+        # The input files
+        "src" :
+            # include a umd-header template
+            - "!tpl:umd-header.tpl.js"
+            - "../src/file1.js"
+            - "../src/file2.js"
+            # include a umd-footer template
+            - "!tpl:umd-footer.tpl.js"
+
+             
+        # The file to extract the header (else first file in SRC list is used)
+        "header" : "../src/file1.js"
+
+
+        # Any texts to be replaced in the final file
+        "replace" :
+            - "a" : "b"
+            - "c" : "d"
+
+            
+        # allow some pre-process to take place
+        "preprocess": []
+
+
+        # Extract documentation from the source
+        "doc" :
+            # start of documentation block
+            "startdoc" : "/**[DOC_MARKUP]"
+            # end of documentation block
+            "enddoc" : "[/DOC_MARKUP]**/"
+            # remove this string from the the start of each doc block line
+            "trim" : "* "
+            # or use a regular expression to trim the start part of each line
+            "trimx" : "\\s*\\*"
+            # separator between each doc block in the output file (default is 2 lines)
+            "separator" : "\n\n=====================================================\n\n"
+            # documentation output file
+            "output" : "../doc/manual.md"
+
+            
+        # Minify the Package
+        "minify" :
+            # Options for Node UglifyJS Compiler (if used, default), (mangle and compress)
+            "uglifyjs" : 
+                - "-m -c"
+            # Options for Java Closure Compiler (if used)
+            "closure" : 
+                - "--language_in=ECMASCRIPT5_STRICT"
+            # Options for Java YUI Compressor Compiler (if used)
+            "yui" : 
+                - "--preserve-semi"
+            # Options for CSS Minifier, if the files are .css
+            "cssmin" :
+                - "--embed-images"
+                #- "--embed-fonts"
+
+                
+        # allow some post-process to take place
+        "postprocess": []
+
+
+        # The final output file
+        "out" : "../build/package_output.min.js"
