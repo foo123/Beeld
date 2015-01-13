@@ -16,11 +16,9 @@
     var PROTO = 'prototype', HAS = 'hasOwnProperty',
         // basic modules
         fs = require('fs'), path = require('path'), 
-        exec = require('child_process').exec,
-        realpath = fs.realpathSync, readFile = fs.readFileSync, writeFile = fs.writeFileSync, 
-        exists = fs.existsSync, unLink = fs.unlinkSync, 
-        dirname = path.dirname, joinPath = path.join,
-        exit = process.exit, echo = console.log, echoStdErr = console.error,
+        exec_async = require('child_process').exec,
+        realpath = fs.realpathSync, dirname = path.dirname, joinPath = path.join,
+        exit = process.exit, echo = console.log, echo_stderr = console.error,
         // extra modules needed, node-temp
         temp = require('temp'),
         
@@ -46,37 +44,52 @@
         
         read = function( file, enc ) {
             var buf = "";
-            if ( exists( file ) )
+            if ( file && fs.existsSync( file ) )
             {
-                try { buf = readFile(file, {encoding: enc||'utf8'}).toString( );  }
+                try { buf = fs.readFileSync(file, {encoding: enc||'utf8'}).toString( );  }
                 catch (e) { buf = ""; }
             }
             return buf;
         },
         
+        read_async = function( file, enc, cb ) {
+            fs.exists(file, function(yes){
+                if ( yes )
+                {
+                    fs.readFile(file, {encoding: enc||'utf8'}, function(err,data){
+                        if ( cb ) cb( err, data.toString() );
+                    });
+                }
+                else if ( cb )
+                {
+                    cb( '' );
+                }
+            });
+        },
+        
         write = function( file, text, enc ) {
             var res = null;
-            try { res = writeFile(file, text.toString(), {encoding: enc||'utf8'});  }
+            try { res = fs.writeFileSync(file, text.toString(), {encoding: enc||'utf8'});  }
             catch (e) { }
             return res;
         },
         
-        unlink = function( file ) {
-            if ( exists(file) ) unLink( file );
+        write_async = function( file, text, enc, cb ) {
+            fs.writeFile(file, text.toString(), {encoding: enc||'utf8'}, function(err){
+                if ( cb ) cb( err );
+            });
+        },
+        
+        unlink_async = function( file ) {
+            if ( file )
+            {
+                fs.exists(file, function(yes){ if ( yes ) fs.unlink(file, function(err){ }); });
+            }
         },
         
         cleanup = function( files ) {
             var i, l = files.length;
-            for (i=0; i<l; i++)
-            {
-                if ( files[i] )
-                {
-                    try{
-                        unlink( files[i] );
-                    } catch (e) {}
-                }
-                files[i] = null;
-            }
+            for (i=0; i<l; i++) unlink_async( files[i] );
         },
         
         fileExt = function( fileName ) { return path.extname(fileName).toString( ); },
@@ -99,8 +112,22 @@
         
         // needed variables
         /*CWD = process.cwd( ),*/ DIR = realpath(__dirname), FILE = path.basename(__filename), 
-        TPLS = { }, parseArgs, parseOptions, getRealPath, getTpl, Pipeline, DTO, Beeld
+        TPLS = { }, parseArgs, parseOptions, getRealPath, getTpl, 
+        DynamicObject, DTO, Pipeline, Beeld
     ; 
+    
+    DynamicObject = function( properties ) {
+        var obj = new Object();
+        if ( properties )
+        {
+            for (var k in properties)
+            {
+                if ( properties[HAS](k) )
+                    obj[ k ] = properties[ k ];
+            }
+        }
+        return obj;
+    };
     
     //
     // adapted from node-commander package
@@ -206,11 +233,65 @@
         else return file; 
     };
     
+    function create_process_loop(dto, process_list, params)
+    {
+        var cmd, i = 0, l = process_list.length, step = 1;
+        var process_loop = function process_loop( err, data ) {
+            var tmp;
+            if ( err )
+            {
+                params.err = 'Error executing "'+cmd+'"';
+                dto.abort( );
+            }
+            if ( 1 === step )
+            {
+                step = 2; i = 0;
+                cmd = 'write input file for process_loop';
+                write_async(params.in_tuple, params.srcText, params.encoding, process_loop);
+                return;
+            }
+            if ( 2 === step )
+            {
+                if ( i < l )
+                {
+                    cmd = process_list[i]
+                            .split( '$dir' ).join( params.basePath )
+                            .split( '$cwd' ).join( params.cwd )
+                            .split( '$tpls' ).join( Beeld.templatesPath )
+                            .split( '$infile' ).join( params.in_tuple )
+                            .split( '$outfile' ).join( params.out_tuple )
+                        ;
+                    tmp = params.in_tuple;
+                    params.in_tuple = params.out_tuple;
+                    params.out_tuple = tmp;
+                    i+=1;
+                    exec_async(cmd, null, process_loop);
+                    return;
+                }
+                else
+                {
+                    step = 3;
+                }
+            }
+            if ( 3 === step )
+            {
+                step = 4;
+                cmd = 'read output file for process_loop';
+                read_async(params.in_tuple, params.encoding, process_loop);
+                return;
+            }
+            params.srcText = data;
+            dto.next( );
+        };
+        return process_loop;
+    }
+    
     DTO = function( params, next, abort ) {
         this._params = params;
         this._next = next;
         this._abort = abort;
     };
+    DTO.Params = DynamicObject;
     DTO[PROTO] = {
         constructor: DTO
         ,_params: null
@@ -352,9 +433,10 @@
         
         // parse input arguments, options and settings in hash format
         ,parse: function( ) {
-            var params = {}, config, options,  
+            var params, config, options,  
                 configurationFile, full_path, ext;
             
+            params = DynamicObject( );
             options = parseOptions({
                 'help' : false,
                 'config' : false,
@@ -385,20 +467,20 @@
             // parse dependencies file in JSON format
             if ( ".json" == ext ) 
             {
-                params.inputType = Beeld.parsers.JSON.format + ' (' + Beeld.parsers.JSON.ext + ')';
-                config = Beeld.parsers.JSON.parse( configurationFile );
+                params.inputType = Beeld.Parsers.JSON.format + ' (' + Beeld.Parsers.JSON.ext + ')';
+                config = Beeld.Parsers.JSON.parse( configurationFile );
             }
             // parse dependencies file in YAML format
             else if ( ".yml" == ext || ".yaml" == ext )
             {
-                params.inputType = Beeld.parsers.YAML.format + ' (' + Beeld.parsers.YAML.ext + ')';
-                config = Beeld.parsers.YAML.parse( configurationFile );
+                params.inputType = Beeld.Parsers.YAML.format + ' (' + Beeld.Parsers.YAML.ext + ')';
+                config = Beeld.Parsers.YAML.parse( configurationFile );
             }
             // parse dependencies file in custom format
             else
             {
-                params.inputType = Beeld.parsers.CUSTOM.format + ' (' + Beeld.parsers.CUSTOM.ext + ')';
-                config = Beeld.parsers.CUSTOM.parse( configurationFile );
+                params.inputType = Beeld.Parsers.CUSTOM.format + ' (' + Beeld.Parsers.CUSTOM.ext + ')';
+                config = Beeld.Parsers.CUSTOM.parse( configurationFile );
             }
             config = config||{};
             params.config = config;
@@ -498,10 +580,11 @@
                 }
                 dto.next( );
             };
-            finish_process = function( ){ 
+            finish_process = function( dto ){ 
                 pipeline.dispose( );
                 pipeline = null;
                 cleanup([params.in_tuple, params.out_tuple]);
+                dto.dispose( );
                 params = null;
             };
             next_task = function( pipeline, config, tasks, default_actions, actions ) {
@@ -567,8 +650,10 @@
     Beeld.compilersPath = joinPath(DIR, "compilers") + '/';
     Beeld.templatesPath = joinPath(DIR, "templates") + '/';
     Beeld.parsersPath = joinPath(DIR, "parsers") + '/';
-    Beeld.parsers = {
-    JSON: {
+    Beeld.Parsers = {
+    Path: Beeld.parsersPath,
+    
+    JSON: DynamicObject({
         name: 'JSON Parser',
         format: 'JSON Format',
         ext: ".json",
@@ -578,39 +663,39 @@
             return JSON;
         },
         parse: function( text ) {
-            return Beeld.parsers.JSON.parser.parse( text );
+            return JSON.parse( text );
         }
-    },
-    YAML: {
+    }),
+    YAML: DynamicObject({
         name: 'Yaml Symfony Parser',
         format: 'Yaml Format',
         ext: ".yml/.yaml",
         path: Beeld.parsersPath + 'yaml.js',
         parser: null,
         load: function( ) {
-            return require( Beeld.parsers.YAML.path );
+            return require( Beeld.Parsers.YAML.path );
         },
         parse: function( text ) {
-            if ( !Beeld.parsers.YAML.parser ) 
-                Beeld.parsers.YAML.parser = Beeld.parsers.YAML.load( );
-            return Beeld.parsers.YAML.parser.parse( text );
+            if ( !Beeld.Parsers.YAML.parser ) 
+                Beeld.Parsers.YAML.parser = Beeld.Parsers.YAML.load( );
+            return Beeld.Parsers.YAML.parser.parse( text );
         }
-    },
-    CUSTOM: {
+    }),
+    CUSTOM: DynamicObject({
         name: 'Custom Parser',
         format: 'Custom Format',
         ext: ".custom/*",
         path: Beeld.parsersPath + 'custom.js',
         parser: null,
         load: function( ) {
-            return require( Beeld.parsers.CUSTOM.path );
+            return require( Beeld.Parsers.CUSTOM.path );
         },
         parse: function( text ) {
-            if ( !Beeld.parsers.CUSTOM.parser ) 
-                Beeld.parsers.CUSTOM.parser = Beeld.parsers.CUSTOM.load( );
-            return Beeld.parsers.CUSTOM.parser.fromString( text );
+            if ( !Beeld.Parsers.CUSTOM.parser ) 
+                Beeld.Parsers.CUSTOM.parser = Beeld.Parsers.CUSTOM.load( );
+            return Beeld.Parsers.CUSTOM.parser.parse( text );
         }
-    }
+    })
     };
     Beeld.action_initially = function( dto ) { 
         return dto.next( );
@@ -716,41 +801,7 @@
         var params = dto.params( ), config = params.config;
         if ( config[HAS]("preprocess") && config.preprocess.length )
         {
-            var preprocess = [].concat(config.preprocess), l = preprocess.length, i = 0,
-                in_file = params.in_tuple, out_file = params.out_tuple, next;
-            
-            write( in_file, params.srcText, params.encoding );
-            next = function( error/*, stdout, stderr*/ ) {
-                var cmd, tmp;
-                if ( error )
-                {
-                    params.err = error;
-                    dto.abort( );
-                }
-                else if ( i < l )
-                {
-                    cmd = preprocess[i]
-                            .split( '$dir' ).join( params.basePath )
-                            .split( '$cwd' ).join( params.cwd )
-                            .split( '$tpls' ).join( Beeld.templatesPath )
-                            .split( '$infile' ).join( in_file )
-                            .split( '$outfile' ).join( out_file )
-                        ;
-                    tmp = in_file;
-                    in_file = out_file;
-                    out_file = tmp;
-                    i+=1;
-                    exec(cmd, null, next);
-                }
-                else
-                {
-                    params.srcText = read( in_file, params.encoding );
-                    params.in_tuple = in_file;
-                    params.out_tuple = out_file;
-                    dto.next( );
-                }
-            };
-            next( null );
+            create_process_loop(dto, [].concat(config.preprocess), params)( null );
         }
         else
         {
@@ -817,123 +868,106 @@
                     docs[i] = tmp.join( "\n" );
                 }
             }
-            write(docFile, docs.join( sep ), params.encoding);
+            write_async(docFile, docs.join( sep ), params.encoding);
         }
         return dto.next( );
     };
     Beeld.action_minify = function( dto ) {
         var params = dto.params( ), config = params.config;
-        if ( config[HAS]('minify') && '' != params.srcText )
+        if ( config[HAS]('minify') && !!params.srcText )
         {
             var minsets = config.minify;
             
             if ( minsets[HAS]('uglifyjs') )
             {
                 // make it array
-                params.compilers['uglifyjs']['options'] = [].concat( minsets['uglifyjs'] ).join(" ");
+                params.compilers.uglifyjs.options = [].concat( minsets['uglifyjs'] ).join(" ");
             }
             if ( minsets[HAS]('closure') )
             {
                 // make it array
-                params.compilers['closure']['options'] = [].concat( minsets['closure'] ).join(" ");
+                params.compilers.closure.options = [].concat( minsets['closure'] ).join(" ");
             }
             if ( minsets[HAS]('yui') )
             {
                 // make it array
-                params.compilers['yui']['options'] = [].concat( minsets['yui'] ).join(" ");
+                params.compilers.yui.options = [].concat( minsets['yui'] ).join(" ");
             }
             if ( minsets[HAS]('cssmin') )
             {
                 // make it array
-                params.compilers['cssmin']['options'] = [].concat( minsets['cssmin'] ).join(" ");
+                params.compilers.cssmin.options = [].concat( minsets['cssmin'] ).join(" ");
             }
             
-            var cmd, extra = '', compiler = params.compilers[params.selectedCompiler];
+            var cmd, extra = '', selected = params.selectedCompiler,
+                selectedCompiler = params.compilers[selected];
             // use the selected compiler
-            if ('cssmin'==params.selectedCompiler && 0 > compiler['options'].indexOf("--basepath "))
+            if ('cssmin'===selected && 0 > selectedCompiler.options.indexOf("--basepath "))
             {
-                // needed by cssmin mostly
-                /*if (!params.outputToStdOut)
-                    extra = "--basepath "+dirname(params.outFile);
-                else
-                    extra = "";*/
                 extra = "--basepath "+params.basePath;
             }
-            else if ('yui'==params.selectedCompiler || 'closure'==params.selectedCompiler)
+            else if ('yui'===selected || 'closure'===selected)
             {
                 extra = "--charset "+params.encoding;
             }
                 
-            cmd = compiler['compiler']
+            cmd = selectedCompiler.compiler
                     .split('__{{PATH}}__').join(Beeld.compilersPath)
                     .split('__{{EXTRA}}__').join(extra)
-                    .split('__{{OPTIONS}}__').join(compiler['options'])
+                    .split('__{{OPTIONS}}__').join(selectedCompiler.options)
                     .split('__{{INPUT}}__').join(params.in_tuple)
                     .split('__{{OUTPUT}}__').join(params.out_tuple)
                 ;
-            write( params.in_tuple, params.srcText, params.encoding );
-
-            // a chain of listeners to avoid timing issues
-            exec(cmd, null, function(error, stdout, stderr) {
-                if ( !error )
+            write_async( params.in_tuple, params.srcText, params.encoding, function( err ){
+                if ( !err )
                 {
-                    params.srcText = read( params.out_tuple, params.encoding );
-                    //echo(stdout||'');
-                    if (stderr) echoStdErr(stderr);
-                    dto.next( );
+                    // add some delay here
+                    setTimeout(function(){
+                        exec_async(cmd, null, function(err, stdout, stderr) {
+                            if ( stderr ) echo_stderr(stderr);
+                            if ( !err )
+                            {
+                                // add some delay here
+                                setTimeout(function(){
+                                    read_async( params.out_tuple, params.encoding, function(err, data){
+                                        if ( !err )
+                                        {
+                                            params.srcText = data;
+                                            dto.next( );
+                                        }
+                                        else
+                                        {
+                                            params.err = 'Error reading minified file';
+                                            dto.abort( );
+                                        }
+                                    });
+                                }, 100);
+                            }
+                            else
+                            {
+                                params.err = 'Error executing "'+cmd+'"';
+                                dto.abort( );
+                            }
+                        });
+                    }, 100);
                 }
                 else
                 {
-                    params.err = error;
-                    if (stderr) echoStdErr(stderr);
+                    params.err = 'Error writing input file for minification';
                     dto.abort( );
                 }
             });
         }
         else
         {
-            dto.next( );
+            return dto.next( );
         }
     };
     Beeld.action_postprocess = function( dto ) { 
         var params = dto.params( ), config = params.config;
         if ( config[HAS]("postprocess") && config.postprocess.length )
         {
-            var postprocess = [].concat(config.postprocess), l = postprocess.length, i = 0,
-                in_file = params.in_tuple, out_file = params.out_tuple, next;
-            
-            write( in_file, params.srcText, params.encoding );
-            next = function( error/*, stdout, stderr*/ ) {
-                var cmd, tmp;
-                if ( error )
-                {
-                    params.err = error;
-                    dto.abort( );
-                }
-                else if ( i < l )
-                {
-                    cmd = postprocess[i]
-                            .split( '$dir' ).join( params.basePath )
-                            .split( '$cwd' ).join( params.cwd )
-                            .split( '$tpls' ).join( Beeld.templatesPath )
-                            .split( '$infile' ).join( in_file )
-                            .split( '$outfile' ).join( out_file )
-                        ;
-                    tmp = in_file;
-                    in_file = out_file;
-                    out_file = tmp;
-                    i+=1;
-                    exec(cmd, null, next);
-                }
-                else
-                {
-                    params.srcText = read( in_file, params.encoding );
-                    params.in_tuple = in_file;
-                    params.out_tuple = out_file;
-                    dto.next( );
-                }
-            };
-            next( null );
+            create_process_loop(dto, [].concat(config.postprocess), params)( null );
         }
         else
         {
@@ -959,9 +993,9 @@
             var buffer = [ ], i, filename;
             for (i=0; i<count; i++)
             {
-                if (!bundleFiles[i].length) continue;
-                filename=getRealPath( bundleFiles[i], params.basePath );
-                buffer.push( read(filename, params.encoding) );
+                filename = bundleFiles[i];
+                if (!filename.length) continue;
+                buffer.push( read( getRealPath( filename, params.basePath ), params.encoding ) );
             }
             params.bundleText = buffer.join("\n") + "\n";
         }
@@ -971,10 +1005,18 @@
         var params = dto.params( ), text;
         // write the processed file
         text = params.bundleText + params.headerText + params.srcText;
-        if ( params.outputToStdOut ) echo( text );
-        else write( params.outFile, text, params.encoding );
         params.bundleText=null; params.headerText=null; params.srcText=null;
-        return dto.next( );
+        if ( params.outputToStdOut ) 
+        {
+            echo( text );
+            return dto.next( );
+        }
+        else 
+        {
+            write_async( params.outFile, text, params.encoding, function(){
+                dto.next( );
+            });
+        }
     };
     Beeld.action_finally = function( dto ) {
         return dto.next( );

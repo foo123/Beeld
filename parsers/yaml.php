@@ -1605,13 +1605,13 @@ class Yaml
 
 class Yaml_Parser
 {
-    public static function fromString($s)
+    public static function parse($s)
     {
         return Yaml::parse( $s/*, false, true*/ );
     }
-    
-    public static function fromFile($filename)
+    // alias
+    public static function fromString($s)
     {
-        return self::fromString( file_get_contents($filename) );
+        return Yaml::parse( $s/*, false, true*/ );
     }
 }

@@ -8,183 +8,181 @@
 *
 **/
 !function (root, moduleName, moduleDefinition) {
-
-    //
     // export the module
-    
+    var m;
     // node, CommonJS, etc..
-    if ( 'object' == typeof(module) && module.exports ) module.exports = moduleDefinition();
-    
-    // AMD, etc..
-    else if ( 'function' == typeof(define) && define.amd ) define( moduleDefinition );
-    
-    // browser, etc..
-    else root[ moduleName ] = moduleDefinition();
-
+    if ( 'object' === typeof(module) && module.exports ) module.exports = moduleDefinition();
+    // browser and AMD, etc..
+    else (root[ moduleName ] = m = moduleDefinition()) && ('function' === typeof(define) && define.amd && define(moduleName,[],function(){return m;}));
 
 }(this, 'Custom_Parser', function( undef ) {
-    
-    var  fs = (require) ? require('fs') : null,
-        ACTUAL = {
-            '\\n' : "\n",
-            '\\t' : "\t",
-            '\\v' : "\v",
-            '\\f' : "\f"
-        },
-        NL = /\n\r|\r\n|\r|\n/g, 
-        BLOCK = /^([a-zA-Z0-9\-_]+)\s*(=\[\{\}\]|=\[\]|=\{\}|=$)?/,
-        ENDBLOCK = /^(@\s*)+/,
-        MAP = 1, LIST = 2, ORDEREDMAP = 3, VAL = 0
+    "use strict";
+    var PROTO = 'prototype', HAS = 'hasOwnProperty', CHAR = 'charAt',
+        ESC = [
+        ['\\n', "\n"],
+        ['\\r', "\r"],
+        ['\\t', "\t"],
+        ['\\v', "\v"],
+        ['\\f', "\f"]
+        ],
+        RE_NEWLINE = /\n\r|\r\n|\r|\n/g, 
+        //RE_BLOCK = /^([a-zA-Z0-9\-_]+)\s*(=\[\{\}\]|=\[\]|=\{\}|=)?/,
+        RE_ENDBLOCK = /^(@\s*)+/,
+        T_VAL = 1,
+        T_MAP = 2,
+        T_LIST = 3,
+        T_ORDEREDMAP = 4
     ;
     
     var 
-        trim = function(s) {
-            return (s) ? s.replace(/^\s+/g, '').replace(/\s+$/g, '') : s;
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/Trim
+        trim = String[PROTO].trim 
+                ? function( s ){ return s.trim( ); } 
+                : function( s ){ return s.replace(/^\s+|\s+$/g, ''); }, 
+        
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/startsWith
+        startsWith = String[PROTO].startsWith 
+                ? function( str, pre, pos ){ return str.startsWith(pre, pos||0); } 
+                : function( str, pre, pos ){ return pre === str.slice(pos||0, pre.length); },
+        
+        removeComment = function( s, comm, pos ) {
+            var p = arguments.length > 2 ? pos : s.indexOf( comm );
+            return trim( -1 < p ? s.slice(0, p) : s );
         },
         
-        removeComment = function(s, comm) {
-            s = s.split( comm );
-            return trim( s[0] );
-        },
-        
-        startsWith = function(s, prefix) { return (s && (prefix == s.substr(0, prefix.length))); },
-        
-        parseStr = function(s, q) {
-            var endq = s.indexOf(q, 1);
-            var quoted = s.substr(1, endq-1);
-            var rem = trim( s.substr( endq ) );
-            for (var c in ACTUAL)
-                quoted = quoted.split( c ).join( ACTUAL[c] );
-            quoted = quoted.split( '\\\\' ).join( '\\' );
+        getStr = function( s, q, and_un_escape ) {
+            var i = 1, l = s.length, esc = false, 
+                ch = '', quoted = '', rem = '';
+            while ( i < l )
+            {
+                ch = s[CHAR]( i++ );
+                if ( q === ch && !esc ) break;
+                esc = !esc && ('\\' === ch);
+                quoted += ch;
+            }
+            rem = trim( s.slice( i ) );
+            if ( false !== and_un_escape )
+            {
+                for (i=0; i<ESC.length; i++)
+                    quoted = quoted.split( ESC[i][0] ).join( ESC[i][1] );
+                quoted = quoted.split( '\\\\' ).join( '\\' );
+            }
             return [quoted, rem];
         },
         
-        getQuotedValue = function( line ) {
-            var linestartswith = line[0];
-            
+        getVal = function( line ) {
+            var linestartswith = line[CHAR](0);
             // quoted string
             if ( '"'==linestartswith || "'"==linestartswith || "`"==linestartswith )
-            {
-                var res = parseStr( line, linestartswith );
-                return res[0];
-            }
+                return getStr( line, linestartswith )[0];
             // un-quoted string
             else
-            {
                 return removeComment( line, '#' );
-            }
         },
         
-        getKeyValuePair = function( line ) {
-            var linestartswith = line[0];
+        getKeyVal = function( line ) {
+            var linestartswith = line[CHAR](0), res, key, val,
+                eq_index, comm_index, valstartswith;
             
             // quoted string
             if ( '"'==linestartswith || "'"==linestartswith || "`"==linestartswith )
             {
-                var res = parseStr(line, linestartswith);
-                var key = res[0];
-                line = res[1];
+                res = getStr(line, linestartswith);
+                key = res[0]; line = res[1];
                 
                 // key-value pair
-                var eq_index = line.indexOf('=');
-                var comm_index = line.indexOf('#');
+                eq_index = line.indexOf('=');
+                comm_index = line.indexOf('#');
                 
-                if ( eq_index>-1 && (comm_index<0 || eq_index<comm_index) )
+                if ( -1 < eq_index && (0 > comm_index || eq_index < comm_index) )
                 {
-                    line = line.split('=');
-                    line.shift()
-                    var value = line.join('=');
+                    val = line.slice(eq_index+1);
                     
-                    if ( startsWith(value, "[{}]"))
+                    if ( startsWith(val, "[{}]"))
                     {
-                        return [key, [], ORDEREDMAP];
+                        return [key, [], T_ORDEREDMAP];
                     }
-                    else if ( startsWith(value, "[]"))
+                    else if ( startsWith(val, "[]"))
                     {
-                        return [key, [], LIST];
+                        return [key, [], T_LIST];
                     }
-                    else if ( startsWith(value, "{}"))
+                    else if ( startsWith(val, "{}"))
                     {
-                        return [key, {}, MAP];
+                        return [key, {}, T_MAP];
                     }
                     
-                    if ( value )
+                    if ( val )
                     {
-                        value = trim(value);
-                        var valuestartswith = value[0];
+                        val = trim( val );
+                        valstartswith = val[CHAR](0);
                         
                         // quoted value
-                        if ( '"'==valuestartswith || "'"==valuestartswith || "`"==valuestartswith )
+                        if ( '"'==valstartswith || "'"==valstartswith || "`"==valstartswith )
                         {
-                            res = parseStr(value, valuestartswith);
-                            value = res[0];
+                            val = getStr(val, valstartswith)[0];
                         }
                         else
                         {
-                            value = removeComment(value, '#');
+                            val = removeComment(val, '#', comm_index);
                         }
                     }
                 }
                 else
                 {
-                    line = line.split('=');
-                    line.shift()
-                    var value = removeComment(line.join('='), '#');
+                    val = removeComment(line, '#', comm_index);
                 }
-                return [key, value, VAL];
+                return [key, val, T_VAL];
             }
             // un-quoted string
             else
             {
-                line = line.split('=');
+                eq_index = line.indexOf('=');
+                key = trim(line.slice(0, eq_index));
+                val = line.slice(eq_index+1);
                 
-                var key = trim(line.shift());
-                var value = line.join('=');
-                
-                if ( startsWith(value, "[{}]"))
+                if ( startsWith(val, "[{}]"))
                 {
-                    return [key, [], ORDEREDMAP];
+                    return [key, [], T_ORDEREDMAP];
                 }
-                else if ( startsWith(value, "[]"))
+                else if ( startsWith(val, "[]"))
                 {
-                    return [key, [], LIST];
+                    return [key, [], T_LIST];
                 }
-                else if ( startsWith(value, "{}"))
+                else if ( startsWith(val, "{}"))
                 {
-                    return [key, {}, MAP];
+                    return [key, {}, T_MAP];
                 }
                 
-                if ( value )
+                if ( val )
                 {
-                    value = trim(value);
-                    var valuestartswith = value[0];
+                    val = trim(val);
+                    valstartswith = val[CHAR](0);
                     
                     // quoted value
-                    if ( '"'==valuestartswith || "'"==valuestartswith || "`"==valuestartswith )
+                    if ( '"'==valstartswith || "'"==valstartswith || "`"==valstartswith )
                     {
-                        var res = parseStr(value, valuestartswith);
-                        value = res[0];
+                        val = getStr(val, valuestartswith)[0];
                     }
                     else
                     {
-                        value = removeComment(value, '#');
+                        val = removeComment(val, '#');
                     }
                 }
                 
-                return [key, value, VAL];
+                return [key, val, T_VAL];
             }
         }
     ;
     
     var Context = function(buffer, block, type, prev) {
-        this.buffer = buffer;
-        this.block = block;
-        this.type = type;
-        this.prev = prev || null;
-        this.next = null;
+        var self = this;
+        self.buffer = buffer;
+        self.block = block;
+        self.type = type;
+        self.prev = prev || null;
+        self.next = null;
     };
-    Context.prototype = {
-        
+    Context[PROTO] = {
         constructor: Context,
         
         prev: null,
@@ -198,27 +196,25 @@
             this.next = ctx;
             return ctx;
         },
-        
         pop: function() {
             return this.prev || null;
         }
     };
     
-    var CustomParser = self = {
-        
-        fromString : function(s)  {
+    var Custom_Parser = {
+        parse: function( s ) {
             
-            // settings buffer
-            var settings = {};
+            // rootObj buffer
+            var rootObj = {};
             
             // current context
-            var ctx = new Context(settings, null, MAP), currentBlock, currentBuffer, isType;
+            var ctx = new Context(rootObj, null, T_MAP), currentBlock, currentBuffer;
 
             // parse the lines
             var i, line, lines, lenlines, block, endblock, j, jlen, numEnds, keyval, kvmap;
 
             s = ''+s;
-            lines = s.split( NL );
+            lines = s.split( RE_NEWLINE );
             lenlines = lines.length;
             
             // parse it line-by-line
@@ -227,95 +223,74 @@
                 // strip the line of comments and extra spaces
                 line = trim( lines[i] );
 
-                // comment or empty line, skip it
-                if ( !line.length || '#'==line[0] ) continue;
+                // empty line or comment, skip it
+                if ( !line.length || '#'==line[CHAR](0) ) continue;
 
-                // block/directive line, parse it
-                if ( !ctx.block && (block = BLOCK.exec( line )) )
-                {
-                    currentBlock = block[1];
-                    if ( !block[2] || '='==block[2] ) isType = VAL;
-                    else if ( '=[{}]'==block[2] ) isType = ORDEREDMAP;
-                    else if ( '=[]'==block[2] ) isType = LIST;
-                    else if ( '={}'==block[2] ) isType = MAP;
-                    
-                    currentBuffer = ctx.buffer;
-                    if ( undef === currentBuffer[ currentBlock ] )
-                    {
-                        if (LIST === isType)
-                            currentBuffer[ currentBlock ] = [];
-                        else if (ORDEREDMAP === isType)
-                            currentBuffer[ currentBlock ] = [];
-                        else if (MAP === isType)
-                            currentBuffer[ currentBlock ] = {};
-                        else
-                            currentBuffer[ currentBlock ] = '';
-                    }
-                    ctx = ctx.push(currentBuffer, currentBlock, isType);
-                    continue;
-                }
-                
-                if ( endblock = ENDBLOCK.exec( line ) )
+                // end of block/directive
+                if ( endblock = RE_ENDBLOCK.exec( line ) )
                 {
                     numEnds = line.split("@").length-1;
-                    //if ( VAL === ctx.type ) numEnds+=1;
-                    for (j=0; j<numEnds && ctx; j++)
-                        ctx = ctx.pop();
-                    
-                    ctx = ctx || new Context(settings, null, MAP);
+                    for (j=0; j<numEnds && ctx; j++) ctx = ctx.pop();
+                    if ( !ctx ) ctx = new Context(rootObj, null, T_MAP);
                     continue;
                 }
                 
                 // if any settings need to be stored, store them in the appropriate buffer
-                if ( ctx.block && ctx.buffer )  
+                if ( ctx.buffer )  
                 {
-                    if ( ORDEREDMAP === ctx.type )
+                    // main block/directive
+                    if ( !ctx.block /*&& (block = RE_BLOCK.exec( line ))*/ )
                     {
-                        keyval = getKeyValuePair( line );
-                        kvmap = {}; kvmap[ keyval[0] ] = keyval[1];
-                        ctx.buffer[ ctx.block ].push( kvmap );
-                        var pos = ctx.buffer[ ctx.block ].length-1;
-                        
-                        if ( LIST === keyval[2] || MAP === keyval[2] || ORDEREDMAP === keyval[2] )
+                        keyval = getKeyVal( line );
+                        currentBlock = keyval[ 0 ];
+                        currentBuffer = ctx.buffer;
+                        if ( !currentBuffer[HAS]( currentBlock ) )
+                            currentBuffer[ currentBlock ] = keyval[ 1 ];
+                        ctx = ctx.push(currentBuffer, currentBlock, keyval[ 2 ]);
+                    }
+                    else
+                    {
+                        if ( T_ORDEREDMAP === ctx.type )
                         {
-                            ctx = ctx.push(ctx.buffer[ ctx.block ][ pos ], keyval[0], keyval[2]);
+                            keyval = getKeyVal( line );
+                            kvmap = {}; kvmap[ keyval[0] ] = keyval[1];
+                            ctx.buffer[ ctx.block ].push( kvmap );
+                            var pos = ctx.buffer[ ctx.block ].length-1;
+                            
+                            if ( T_LIST === keyval[2] || T_MAP === keyval[2] || T_ORDEREDMAP === keyval[2] )
+                            {
+                                ctx = ctx.push(ctx.buffer[ ctx.block ][ pos ], keyval[0], keyval[2]);
+                            }
                         }
-                    }
-                    else if ( MAP === ctx.type )
-                    {
-                        keyval = getKeyValuePair( line );
-                        ctx.buffer[ ctx.block ][ keyval[0] ] = keyval[1];
-                        
-                        if ( LIST === keyval[2] || MAP === keyval[2] || ORDEREDMAP === keyval[2] )
+                        else if ( T_MAP === ctx.type )
                         {
-                            ctx = ctx.push(ctx.buffer[ ctx.block ], keyval[0], keyval[2]);
+                            keyval = getKeyVal( line );
+                            ctx.buffer[ ctx.block ][ keyval[0] ] = keyval[1];
+                            
+                            if ( T_LIST === keyval[2] || T_MAP === keyval[2] || T_ORDEREDMAP === keyval[2] )
+                            {
+                                ctx = ctx.push(ctx.buffer[ ctx.block ], keyval[0], keyval[2]);
+                            }
                         }
-                    }
-                    else if ( LIST === ctx.type )
-                    {
-                        ctx.buffer[ ctx.block ].push( getQuotedValue( line ) );
-                    }
-                    else //if ( VAL === isType )
-                    {
-                        ctx.buffer[ ctx.block ] = getQuotedValue( line );
-                        ctx = ctx.pop();
-                        ctx = ctx || new Context(settings, null, MAP);
+                        else if ( T_LIST === ctx.type )
+                        {
+                            ctx.buffer[ ctx.block ].push( getVal( line ) );
+                        }
+                        else //if ( T_VAL === ctx.type )
+                        {
+                            ctx.buffer[ ctx.block ] = getVal( line );
+                            ctx = ctx.pop();
+                            if ( !ctx ) ctx = new Context(rootObj, null, T_MAP);
+                        }
                     }
                 }
             }
-            
-            return settings;
-        },
-        
-        fromFile : function(filename, keysList, rootSection) {
-            if (fs)
-            {
-                return self.fromString( fs.readFileSync(filename) );
-            }
-            return '';
+            return rootObj;
         }
     };
+    // alias
+    Custom_Parser.fromString = Custom_Parser.parse;
     
     // export it
-    return CustomParser;
+    return Custom_Parser;
 });

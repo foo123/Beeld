@@ -131,19 +131,19 @@ def getTpl(id, enc=None):
 def parseOptions( defaults ):
     # parse args
     if ap:
-        parser = argparse.ArgumentParser(description="Build and Compress Javascript Packages")
+        parser = argparse.ArgumentParser(description="Build Source Code Packages (js/css)")
         parser.add_argument('--config', help="configuration file (REQUIRED)", metavar="FILE")
-        parser.add_argument('--tasks', help="tasks to run (OPTIONAL)", default=defaults['tasks'])
-        parser.add_argument('--compiler', help="uglifyjs (default) | closure | yui | cssmin, Whether to use UglifyJS, Closure, YUI Compressor or CSSMin Compiler", default=defaults['compiler'])
-        parser.add_argument('--enc', help="set text encoding (default utf8)", metavar="ENCODING", default=defaults['enc'])
+        parser.add_argument('--tasks', help="specific tasks to run with commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
+        parser.add_argument('--compiler', help="source compiler to use (OPTIONAL) \nWhether to use uglifyjs, closure, \nyui, or cssmin compiler \nDEFAULT: uglifyjs", default=defaults['compiler'])
+        parser.add_argument('--enc', help="set text encoding \nDEFAULT: utf-8", metavar="ENCODING", default=defaults['enc'])
         options = parser.parse_args()
 
     else:
-        parser = optparse.OptionParser(description='Build and Compress Javascript Packages')
+        parser = optparse.OptionParser(description='Build Source Code Packages (js/css)')
         parser.add_option('--config', help="configuration file (REQUIRED)", metavar="FILE")
-        parser.add_option('--tasks', dest='tasks', help="tasks to run (OPTIONAL)", default=defaults['tasks'])
-        parser.add_option('--compiler', dest='compiler', help="uglifyjs (default) | closure | yui | cssmin, Whether to use UglifyJS, Closure, YUI Compressor or CSSMin Compiler", default=defaults['compiler'])
-        parser.add_option('--enc', dest='enc', help="set text encoding (default utf8)", metavar="ENCODING", default=defaults['enc'])
+        parser.add_option('--tasks', dest='tasks', help="specific tasks to run with commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
+        parser.add_option('--compiler', dest='compiler', help="source compiler to use (OPTIONAL) \nWhether to use uglifyjs, closure, \nyui, or cssmin compiler \nDEFAULT: uglifyjs", default=defaults['compiler'])
+        parser.add_option('--enc', dest='enc', help="set text encoding \nDEFAULT: utf-8", metavar="ENCODING", default=defaults['enc'])
         options, remainder = parser.parse_args()
 
     # If no arguments have been passed, show the help message and exit
@@ -164,11 +164,14 @@ def parseOptions( defaults ):
     
     return options
 
-class Params:
-    pass
+class DynamicObject:
+    def __init__(self, properties=None):
+        if properties:
+            for k,v in properties.items(): setattr(self, k, v)
     
+
 class DTO:
-    Params = Params
+    Params = DynamicObject
     
     def __init__(self, params=None, next=None, abort=None):
         self._params = params
@@ -229,62 +232,83 @@ class Pipeline:
         
     
 class BeeldParsers:
-    JSON = {
+    
+    Path = parsersPath
+    JSON = None
+    YAML = None
+    CUSTOM = None
+    
+    def init():
+        parsers = BeeldParsers
+        
+        def JSON_load():
+            return json
+        
+        def JSON_parse( text ):
+            return json.loads( text )
+        
+        def YAML_load():
+            return import_path(BeeldParsers.YAML['path']).Yaml_Parser
+        
+        def YAML_parse( text ):
+            if not BeeldParsers.YAML.parser:
+                BeeldParsers.YAML.parser = BeeldParsers.YAML.load( )
+            return BeeldParsers.YAML.parser.parse( text )
+        
+        def CUSTOM_load():
+            return import_path(BeeldParsers.CUSTOM.path).Custom_Parser
+        
+        def CUSTOM_parse( text ):
+            if not BeeldParsers.CUSTOM.parser:
+                BeeldParsers.CUSTOM.parser = BeeldParsers.CUSTOM.load( )
+            return BeeldParsers.CUSTOM.parser.parse( text )
+        
+        parsers.JSON = DynamicObject({
         'name': 'JSON Parser',
         'format': 'JSON Format',
         'ext': ".json",
         'path': None,
-        'parser': json
-    }
-    YAML = {
-        'name': 'Yaml Symfony Parser',
+        'parser': json,
+        'load': JSON_load,
+        'parse': JSON_parse
+        })
+        
+        parsers.YAML = DynamicObject({
+        'name': 'PyYaml Parser',
         'format': 'Yaml Format',
         'ext': ".yml/.yaml",
-        'path': parsersPath + 'yaml.py',
-        'parser': None
-    }
-    CUSTOM = {
+        'path': parsers.Path + 'yaml.py',
+        'parser': None,
+        'load': YAML_load,
+        'parse': YAML_parse
+        })
+        
+        parsers.CUSTOM = DynamicObject({
         'name': 'Custom Parser',
         'format': 'Custom Format',
         'ext': ".custom/*",
-        'path': parsersPath + 'custom.py',
-        'parser': None
-    }
+        'path': parsers.Path + 'custom.py',
+        'parser': None,
+        'load': CUSTOM_load,
+        'parse': CUSTOM_parse
+        })
     
-    def JSON_load():
-        return json
-    
-    def JSON_parse( text ):
-        return json.loads( text )
-    
-    def YAML_load():
-        return import_path(BeeldParsers.YAML['path']).Yaml_Parser
-    
-    def YAML_parse( text ):
-        if not BeeldParsers.YAML['parser']:
-            BeeldParsers.YAML['parser'] = BeeldParsers.YAML_load( )
-        return BeeldParsers.YAML['parser'].fromString( text )
-    
-    def CUSTOM_load():
-        return import_path(BeeldParsers.CUSTOM['path']).Custom_Parser
-    
-    def CUSTOM_parse( text ):
-        if not BeeldParsers.CUSTOM['parser']:
-            BeeldParsers.CUSTOM['parser'] = BeeldParsers.CUSTOM_load( )
-        return BeeldParsers.CUSTOM['parser'].fromString( text )
-    
-def create_next_loop( dto, process_list, params, non_local ):
-    def next( ):
-        i = non_local['i']
-        l = non_local['l']
-        in_tuple = params.in_tuple
-        out_tuple = params.out_tuple
-        if i < l:
-            cmd = process_list[i].replace('$dir', params.basePath).replace('$cwd', params.cwd).replace('$tpls', templatesPath).replace('$infile', in_tuple).replace('$outfile', out_tuple)
+BeeldParsers.init()
 
-            params.in_tuple = out_tuple
-            params.out_tuple = in_tuple
-            non_local['i'] += 1
+def create_process_loop( dto, p, process_list ):
+    p.process_list = process_list
+    p.process_list_count = len(p.process_list)
+    p.process_list_index = 0
+    write( p.in_tuple, p.srcText, p.encoding )
+    def process_loop( ):
+        in_tuple = p.in_tuple
+        out_tuple = p.out_tuple
+        if p.process_list_index < p.process_list_count:
+            cmd = p.process_list[p.process_list_index].replace('$dir', p.basePath).replace('$cwd', p.cwd).replace('$tpls', templatesPath).replace('$infile', in_tuple).replace('$outfile', out_tuple)
+
+            p.in_tuple = out_tuple
+            p.out_tuple = in_tuple
+            p.process_list_index += 1
             err = os.system(cmd)
             # on *nix systems this is a tuple, similar to the os.wait return result
             # on windows it is an integer
@@ -294,15 +318,15 @@ def create_next_loop( dto, process_list, params, non_local ):
             if not (type(err) is int): err = 255 & (err[1]>>8)
             # some error occured
             if 0!=err: 
-                params.err = 'Error executing "'+cmd+'"'
+                p.err = 'Error executing "'+cmd+'"'
                 dto.abort()
-            else: next( )
+            else: process_loop( )
         else:
-            params.srcText = read(in_tuple, params.encoding)
-            params.in_tuple = in_tuple
-            params.out_tuple = out_tuple
+            p.srcText = read(in_tuple, p.encoding)
+            p.in_tuple = in_tuple
+            p.out_tuple = out_tuple
             dto.next( )
-    return next
+    return process_loop
 
 def create_abort_process( pipeline ):
     def abort_process( params ):
@@ -338,6 +362,7 @@ def create_tasks( pipeline, config, tasks, default_actions, actions ):
         params = dto.params()
         pipeline.dispose( )
         cleanup([params.in_tuple, params.out_tuple])
+        dto.dispose( )
         return None
     
     non_local = {'tasks': tasks, 'i': 0, 'l': len(tasks)}
@@ -391,7 +416,7 @@ class Beeld:
     VERSION = "0.5"
     
     Pipeline = Pipeline
-    parsers = BeeldParsers
+    Parsers = BeeldParsers
     
     def __init__(self):
         self.actions = {
@@ -449,7 +474,7 @@ class Beeld:
         
     def parse(self):
         
-        params = Params()
+        params = DynamicObject()
         
         options = parseOptions({
             'help' : False,
@@ -480,22 +505,22 @@ class Beeld:
         
         # parse dependencies file in JSON format
         if ".json" == ext: 
-            params.inputType = Beeld.parsers.JSON['format'] + ' (' + Beeld.parsers.JSON['ext'] + ')'
-            config = Beeld.parsers.JSON_parse( configurationFile )
+            params.inputType = Beeld.Parsers.JSON.format + ' (' + Beeld.parsers.JSON.ext + ')'
+            config = Beeld.Parsers.JSON.parse( configurationFile )
         # parse dependencies file in YAML format
         elif ".yml" == ext or ".yaml" == ext: 
-            params.inputType = Beeld.parsers.YAML['format'] + ' (' + Beeld.parsers.YAML['ext'] + ')'
-            config = Beeld.parsers.YAML_parse( configurationFile )
+            params.inputType = Beeld.Parsers.YAML.format + ' (' + Beeld.Parsers.YAML.ext + ')'
+            config = Beeld.Parsers.YAML.parse( configurationFile )
         # parse dependencies file in custom format
         else: 
-            params.inputType = Beeld.parsers.CUSTOM['format'] + ' (' + Beeld.parsers.CUSTOM['ext'] + ')'
-            config = Beeld.parsers.CUSTOM_parse( configurationFile )
+            params.inputType = Beeld.Parsers.CUSTOM.format + ' (' + Beeld.Parsers.CUSTOM.ext + ')'
+            config = Beeld.Parsers.CUSTOM.parse( configurationFile )
             
+        if not config: config = {}
         params.config = config
         #import pprint
         #pprint.pprint(params.config)
         #sys.exit(0)
-        
         return params
     
     def build(self, params):
@@ -639,13 +664,7 @@ class Beeld:
         params = dto.params( ) 
         config = params.config
         if "preprocess" in config and config['preprocess']:
-            preprocess = list(config['preprocess']) 
-            i = 0
-            l = len(preprocess) 
-            in_tuple = params.in_tuple
-            out_tuple = params.out_tuple
-            write( in_tuple, params.srcText, params.encoding )
-            create_next_loop(dto, preprocess, params, {'i':i, 'l':l})( )
+            create_process_loop(dto, params, list(config['preprocess']))( )
         else:
             return dto.next( )
         
@@ -757,7 +776,7 @@ class Beeld:
             # some error occured
             if 0!=err: 
                 params.err = 'Error executing "'+cmd+'"'
-                dto.abort()
+                return dto.abort()
             
         return dto.next()
 
@@ -765,13 +784,7 @@ class Beeld:
         params = dto.params( ) 
         config = params.config
         if "postprocess" in config and config['postprocess']:
-            postprocess = list(config['postprocess']) 
-            i = 0
-            l = len(postprocess) 
-            in_tuple = params.in_tuple
-            out_tuple = params.out_tuple
-            write( in_tuple, params.srcText, params.encoding )
-            create_next_loop(dto, postprocess, params, {'i':i, 'l':l})( )
+            create_process_loop(dto, params, list(config['postprocess']))( )
         else:
             return dto.next( )
 
@@ -792,8 +805,7 @@ class Beeld:
 
             for filename in bundleFiles:
                 if not len(filename): continue
-                filename = getRealPath(filename, params.basePath)
-                buffer.append(read(filename, params.encoding))
+                buffer.append( read( getRealPath( filename, params.basePath ), params.encoding ) )
 
             params.bundleText = "\n".join(buffer) + "\n"
         
@@ -803,11 +815,11 @@ class Beeld:
         params = dto.params()
         # write the processed file
         text = params.bundleText+params.headerText+params.srcText
-        if params.outputToStdOut: print (text)
-        else: write(params.outFile, text, params.encoding)
         params.bundleText = None 
         params.srcText = None 
         params.headerText = None
+        if params.outputToStdOut: print (text)
+        else: write(params.outFile, text, params.encoding)
         return dto.next( )
     
     def action_finally(self, dto):

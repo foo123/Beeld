@@ -17,20 +17,16 @@ except ImportError:
 class Yaml_Parser():
     """Yaml parser for Python"""
     
-    def fromString(s):
+    def parse(s):
         if _hasYaml_:
             return yaml.load( self.read(self.depsFile) )
         else:
             print ("PyYaml is not installed!!")
             sys.exit(1)
         return None
-    
-    def fromFile(filename):
-        s = ''
-        with open(filename, 'r') as f:  s = f.read()
-        return Yaml_Parser.fromString(s)
         
-
+# alias
+Yaml_Parser.fromString = Yaml_Parser.parse
 
             
 # for use with 'import *'

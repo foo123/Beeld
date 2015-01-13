@@ -8,22 +8,15 @@
 *
 **/
 !function (root, moduleName, moduleDefinition) {
-
-    //
     // export the module
-    
+    var m;
     // node, CommonJS, etc..
-    if ( 'object' == typeof(module) && module.exports ) module.exports = moduleDefinition();
-    
-    // AMD, etc..
-    else if ( 'function' == typeof(define) && define.amd ) define( moduleDefinition );
-    
-    // browser, etc..
-    else root[ moduleName ] = moduleDefinition();
-
+    if ( 'object' === typeof(module) && module.exports ) module.exports = moduleDefinition();
+    // browser and AMD, etc..
+    else (root[ moduleName ] = m = moduleDefinition()) && ('function' === typeof(define) && define.amd && define(moduleName,[],function(){return m;}));
 
 }(this, 'Ini_Parser', function( undef ) {
-    
+    "use strict";
     var  fs = (require) ? require('fs') : null,
         ACTUAL = {
             '\\n' : "\n",
