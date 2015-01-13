@@ -11,7 +11,7 @@ This is a new framework and tool for building projects from sources, which is ba
 
 ###Usage
 
-* Modify the *sample-config.custom* or *sample-config.json* or *sample-config.yaml* <del>or sample-config.ini</del> file(s) to include the input/output filenames and compiler parameters
+* Modify the *sample-config.custom* or *sample-config.json* or *sample-config.yaml* <del>or sample-config.ini</del> file(s) to include the configuration settings and parameters
 * Configuration file can be in custom format (default), JSON format (.json) or YAML format (.yaml, .yml) <del>or INI format (.ini)</del>
 * Run the .bat or .sh scripts to build the package
 

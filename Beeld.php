@@ -207,22 +207,22 @@ final class BeeldUtils
             $p = pathinfo(__FILE__);
             $FILE=(isset($p['extension'])) ? $p['filename'].'.'.$p['extension'] : $p['filename'];
             
-            self::echo_ ("usage: $FILE [-h] [--config FILE] [--tasks TASKS] [--compiler COMPILER] [--enc ENCODING]");
-            self::echo_ (" ");
-            self::echo_ ("Build Source Code Packages (js/css)");
-            self::echo_ (" ");
-            self::echo_ ("optional arguments:");
-            self::echo_ ("  -h, --help              show this help message and exit");
-            self::echo_ ("  --config   FILE         configuration file (REQUIRED)");
-            self::echo_ ("  --tasks    TASKS        specific tasks to run with commas (OPTIONAL)");
-            self::echo_ ("                          DEFAULT: all tasks defined in config file");
-            self::echo_ ("  --compiler COMPILER     source compiler to use (OPTIONAL)");
-            self::echo_ ("                          Whether to use uglifyjs, closure,");
-            self::echo_ ("                          yui, or cssmin compiler");
-            self::echo_ ("                          DEFAULT: uglifyjs");
-            self::echo_ ("  --enc      ENCODING     set text encoding");
-            self::echo_ ("                          DEFAULT: utf8");
-            self::echo_ (" ");
+            self::echo_("usage: $FILE [-h] [--config FILE] [--tasks TASKS] [--compiler COMPILER] [--enc ENCODING]");
+            self::echo_(" ");
+            self::echo_("Build Source Code Packages (js/css)");
+            self::echo_(" ");
+            self::echo_("optional arguments:");
+            self::echo_("  -h, --help              show this help message and exit");
+            self::echo_("  --config   FILE         configuration file (REQUIRED)");
+            self::echo_("  --tasks    TASKS        specific tasks to run with commas (OPTIONAL)");
+            self::echo_("                          DEFAULT: all tasks defined in config file");
+            self::echo_("  --compiler COMPILER     source compiler to use (OPTIONAL)");
+            self::echo_("                          Whether to use uglifyjs, closure,");
+            self::echo_("                          yui, or cssmin compiler");
+            self::echo_("                          DEFAULT: uglifyjs");
+            self::echo_("  --enc      ENCODING     set text encoding");
+            self::echo_("                          DEFAULT: utf8");
+            self::echo_(" ");
             
             exit(1);
         }
@@ -231,19 +231,15 @@ final class BeeldUtils
     
     public static function process_loop(&$dto, &$p)
     {
-        $in_tuple = $p->in_tuple;
-        $out_tuple = $p->out_tuple;
         if ($p->process_list_index < $p->process_list_count)
         {
             $cmd = str_replace(
-                    array('$dir', '$cwd', '$tpls', '$infile', '$outfile'), 
-                    array($p->basePath, $p->cwd, self::$templatesPath, $in_tuple, $out_tuple), 
+                    array('${DIR}', '${CWD}', '${COMPILERS}', '${TPLS}', '${IN}', '${OUT}'), 
+                    array($p->basePath, $p->cwd, self::$compilersPath, self::$templatesPath, $p->in_tuple, $p->out_tuple), 
                     $p->process_list[$p->process_list_index]
                 );
             // breaks correct shell scripts
             //$cmd = escapeshellcmd( $cmd );
-            $p->in_tuple = $out_tuple;
-            $p->out_tuple = $in_tuple;
             $p->process_list_index += 1;
             
             exec($cmd, $out=array(), $err=0);
@@ -259,11 +255,18 @@ final class BeeldUtils
         }
         else
         {
-            $p->srcText = self::read($in_tuple);
-            $p->in_tuple = $in_tuple;
-            $p->out_tuple = $out_tuple;
+            $p->srcText = self::read($p->out_tuple);
             return $dto->next( );
         }
+    }
+    
+    public static function run_process_loop(&$dto, &$p, $process_list)
+    {
+        $p->process_list =& $process_list;
+        $p->process_list_count = count($p->process_list);
+        $p->process_list_index = 0;
+        BeeldUtils::write( $p->in_tuple, $p->srcText );
+        return self::process_loop($dto, $p);
     }
     
     public static function log_settings( &$dto ) 
@@ -394,7 +397,7 @@ final class BeeldParsers
         'name'=> 'JSON Parser',
         'format'=> 'JSON Format',
         'ext'=> ".json",
-        'path'=> null,
+        'path'=> $this->Path . 'json.php',
         'parser'=> null
         ));
         
@@ -417,11 +420,13 @@ final class BeeldParsers
     
     public function JSON_load()
     {
+        include($this->JSON->path);
     }
     
     public function JSON_parse( $text )
     {
-        return json_decode( $text );
+        if ( !class_exists('Json_Parser') ) $this->JSON_load();
+        return Json_Parser::parse( $text );
     }
     
     public function YAML_load()
@@ -591,22 +596,22 @@ class Beeld
         $this->compilers = array(
         'cssmin' => array(
             'name' => 'CSS Minifier',
-            'compiler' => 'php -f __{{PATH}}__cssmin.php -- __{{EXTRA}}__ __{{OPTIONS}}__ --input=__{{INPUT}}__  --output=__{{OUTPUT}}__',
+            'compiler' => 'php -f ${COMPILERS}cssmin.php -- ${EXTRA} ${OPTIONS} --input=${IN}  --output=${OUT}',
             'options' => ''
         ),
         'uglifyjs' => array(
             'name' => 'Node UglifyJS Compiler',
-            'compiler' => 'uglifyjs __{{INPUT}}__ __{{OPTIONS}}__ -o __{{OUTPUT}}__',
+            'compiler' => 'uglifyjs ${IN} ${OPTIONS} -o ${OUT}',
             'options' => ''
         ),
         'closure' => array(
             'name' => 'Java Closure Compiler',
-            'compiler' => 'java -jar __{{PATH}}__closure.jar __{{EXTRA}}__ __{{OPTIONS}}__ --js __{{INPUT}}__ --js_output_file __{{OUTPUT}}__',
+            'compiler' => 'java -jar ${COMPILERS}closure.jar ${EXTRA} ${OPTIONS} --js ${IN} --js_output_file ${OUT}',
             'options' => ''
         ),
         'yui' => array( 
             'name' => 'Java YUI Compressor Compiler',
-            'compiler' => 'java -jar __{{PATH}}__yuicompressor.jar __{{EXTRA}}__ __{{OPTIONS}}__ --type js -o __{{OUTPUT}}__  __{{INPUT}}__',
+            'compiler' => 'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}',
             'options' => ''
         )
         );
@@ -672,7 +677,7 @@ class Beeld
         
         // parse settings
         $ext = strtolower(BeeldUtils::fileExt($full_path));
-        if (!strlen($ext)) $ext=".custom";
+        if ( !strlen($ext) ) $ext=".custom";
         else $ext="." . $ext;
         
         $configurationFile = BeeldUtils::read($params->configFile);
@@ -709,15 +714,15 @@ class Beeld
         $config = $params->config_full;
         $params->config = array();
         $default_actions = array(
-             'src'
-            ,'header'
-            ,'replace'
-            ,'preprocess'
-            ,'doc'
-            ,'minify'
-            ,'postprocess'
-            ,'bundle'
-            ,'out'
+         'src'
+        ,'header'
+        ,'replace'
+        ,'preprocess'
+        ,'doc'
+        ,'minify'
+        ,'postprocess'
+        ,'bundle'
+        ,'out'
         );
         
         $params->in_tuple = null; 
@@ -839,6 +844,9 @@ class Beeld
                     }
                 }
             }
+            // header file is NOT one of the source files
+            if ( $headerFile && null === $params->headerText )
+                $params->headerText = BeeldUtils::read( BeeldUtils::getRealPath( $headerFile, $params->basePath ) );
             $params->srcText = implode('', $buffer);
         }
         return $dto->next();
@@ -893,11 +901,7 @@ class Beeld
         $config = $params->config;
         if ( isset($config["preprocess"]) )
         {
-            $params->process_list = (array)$config['preprocess'];
-            $params->process_list_count = count($params->process_list);
-            $params->process_list_index = 0;
-            BeeldUtils::write( $params->in_tuple, $params->srcText );
-            return BeeldUtils::process_loop($dto, $params);
+            return BeeldUtils::run_process_loop($dto, $params, (array)$config['preprocess']);
         }
         else
         {
@@ -980,7 +984,7 @@ class Beeld
     {
         $params = $dto->params();
         $config = $params->config;
-        if ( isset($config['minify']) && '' != $params->srcText )
+        if ( isset($config['minify']) && !empty($params->srcText) )
         {
             $minsets = (array)$config['minify'];
             
@@ -993,31 +997,28 @@ class Beeld
             if (isset($minsets['cssmin']))
                 $params->compilers['cssmin']['options'] = implode(" ", (array)$minsets['cssmin']);
             
-            $in_tuple = $params->in_tuple;
-            $out_tuple = $params->out_tuple;
-            BeeldUtils::write($in_tuple, $params->srcText);
+            BeeldUtils::write($params->in_tuple, $params->srcText);
             
             $extra = '';
             // use the selected compiler
             $compiler = $params->compilers[$params->selectedCompiler];
-            if ('cssmin' == $params->selectedCompiler && false === strpos($compiler['options'], "--basepath"))
+            if ('cssmin' === $params->selectedCompiler && false === strpos($compiler['options'], "--basepath"))
             {
                 $extra = "--basepath=".$params->basePath;
             }
-            elseif ('yui' == $params->selectedCompiler || 'closure' == $params->selectedCompiler)
+            elseif ('yui' === $params->selectedCompiler || 'closure' === $params->selectedCompiler)
             {
                 $extra = "--charset ".$params->encoding;
             }
             
             $cmd = str_replace(
-                    array('__{{PATH}}__', '__{{EXTRA}}__', '__{{OPTIONS}}__', '__{{INPUT}}__', '__{{OUTPUT}}__'), 
-                    array(BeeldUtils::$compilersPath, $extra, $compiler['options'], $in_tuple, $out_tuple), 
+                    array('${COMPILERS}', '${EXTRA}', '${OPTIONS}', '${IN}', '${OUT}'), 
+                    array(BeeldUtils::$compilersPath, $extra, $compiler['options'], $params->in_tuple, $params->out_tuple), 
                     $compiler['compiler']
                 );
-            $cmd = escapeshellcmd( $cmd );
-            exec($cmd . ' 2>&1', $out=array(), $err=0);
             
-            if ( !$err ) $params->srcText = BeeldUtils::read($out_tuple);
+            //$cmd = escapeshellcmd( $cmd );
+            exec($cmd . ' 2>&1', $out=array(), $err=0);
             
             // some error occured
             if ( $err ) 
@@ -1025,6 +1026,10 @@ class Beeld
                 $params->err = 'Error executing "'.$cmd.'"';
                 BeeldUtils::echo_stderr(implode(PHP_EOL, (array)$out));
                 return $dto->abort( );
+            }
+            else
+            {
+                $params->srcText = BeeldUtils::read($params->out_tuple);
             }
         }
         return $dto->next( );
@@ -1036,11 +1041,7 @@ class Beeld
         $config = $params->config;
         if ( isset($config["postprocess"]) )
         {
-            $params->process_list = (array)$config['postprocess'];
-            $params->process_list_count = count($params->process_list);
-            $params->process_list_index = 0;
-            BeeldUtils::write( $params->in_tuple, $params->srcText );
-            return BeeldUtils::process_loop($dto, $params);
+            return BeeldUtils::run_process_loop($dto, $params, (array)$config['postprocess']);
         }
         else
         {

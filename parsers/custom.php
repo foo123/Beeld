@@ -43,9 +43,11 @@ final class Custom_Parser_Context
 class Custom_Parser
 {
     const T_VAL = 1;
-    const T_MAP = 2;
-    const T_LIST = 3;
-    const T_ORDEREDMAP = 4;
+    const T_KEYVAL = 2;
+    const T_MAP = 4;
+    const T_LIST = 8;
+    const T_ORDEREDMAP = 16;
+    const T_STRUCTURED = 28; //T_LIST | T_MAP | T_ORDEREDMAP
     
     protected static $RE_NEWLINE = null; 
     //protected static $RE_BLOCK = '/^([a-zA-Z0-9\\-_]+)\\s*(=\\[\\{\\}\\]|=\\[\\]|=\\{\\}|=)?/';
@@ -91,14 +93,14 @@ class Custom_Parser
             $esc = !$esc && ('\\' === $ch);
             $quoted .= $ch;
         }
-        $rem = trim( substr($s, $i) );
+        $rem = substr($s, $i);
         if ( false !== $and_un_escape )
         {
             foreach (self::$ESC as $unesc)
                 $quoted = str_replace($unesc[0], $unesc[1], $quoted);
             $quoted = str_replace('\\\\', '\\', $quoted);
         }
-        return array($quoted, $rem);
+        return array($quoted, trim($rem));
     }
     
     protected static function startsWith($str, $pre, $pos=0) 
@@ -106,7 +108,7 @@ class Custom_Parser
         return (bool)($str && ($pre === substr($str, $pos, strlen($pre)))); 
     }
 
-    protected static function getVal( $line )
+    /*protected static function getVal( $line )
     {
         $linestartswith = $line[0];
         // quoted string
@@ -120,7 +122,7 @@ class Custom_Parser
         {
             return self::removeComment( $line, '#' );
         }
-    }
+    }*/
     
     protected static function getKeyVal( $line )
     {
@@ -133,11 +135,65 @@ class Custom_Parser
             
             // key-value pair
             $eq_index = strpos($line, '=', 0);
-            $comm_index = strpos($line, '#', 0);
             
-            if ( false !== $eq_index && (false === $comm_index || $eq_index < $comm_index) )
+            if ( strlen($line) && 0 === $eq_index )
             {
+                $comm_index = strpos($line, '#', 0);
+                if ( false === $comm_index || $eq_index < $comm_index )
+                {
+                    $val = substr($line, $eq_index+1);
+                    
+                    if ( self::startsWith($val, "[{}]"))
+                    {
+                        return array($key, array(), self::T_ORDEREDMAP);
+                    }
+                    elseif ( self::startsWith($val, "[]"))
+                    {
+                        return array($key, array(), self::T_LIST);
+                    }
+                    elseif ( self::startsWith($val, "{}"))
+                    {
+                        return array($key, array(), self::T_MAP);
+                    }
+                    
+                    if ( $val )
+                    {
+                        $val = trim($val);
+                        $valstartswith = $val[0];
+                        
+                        // quoted value
+                        if ('"'==$valstartswith || "'"==$valstartswith || "`"==$valstartswith)
+                        {
+                            list($val, $rem) = self::getStr($val, $valstartswith);
+                        }
+                        else
+                        {
+                            $val = self::removeComment($val, '#', $comm_index);
+                        }
+                    }
+                }
+                else
+                {
+                    $val = self::removeComment($line, '#', $comm_index);
+                }
+                return array($key, $val, self::T_KEYVAL);
+            }
+            else
+            {
+                // just value, no key-val pair
+                return array(null, $key, self::T_VAL);
+            }
+        }
+        // un-quoted string
+        else
+        {
+            $eq_index = strpos($line, '=', 0);
+            if ( false !== $eq_index )
+            {
+                $key = trim(substr($line, 0, $eq_index));
                 $val = substr($line, $eq_index+1);
+                
+                if ( !strlen($key) ) $key = null;
                 
                 if ( self::startsWith($val, "[{}]"))
                 {
@@ -154,7 +210,6 @@ class Custom_Parser
                 
                 if ( $val )
                 {
-                    $val = trim($val);
                     $valstartswith = $val[0];
                     
                     // quoted value
@@ -164,52 +219,17 @@ class Custom_Parser
                     }
                     else
                     {
-                        $val = self::removeComment($val, '#', $comm_index);
+                        $val = self::removeComment($val, '#');
                     }
                 }
+                
+                return array($key, $val, self::T_KEYVAL);
             }
             else
             {
-                $val = self::removeComment($line, '#', $comm_index);
+                // just value, no key-val pair
+                return array(null, self::removeComment($line, '#'), self::T_VAL);
             }
-            return array($key, $val, self::T_VAL);
-        }
-        // un-quoted string
-        else
-        {
-            $eq_index = strpos($line, '=', 0);
-            $key = trim(substr($line, 0, $eq_index));
-            $val = substr($line, $eq_index+1);
-            
-            if ( self::startsWith($val, "[{}]"))
-            {
-                return array($key, array(), self::T_ORDEREDMAP);
-            }
-            elseif ( self::startsWith($val, "[]"))
-            {
-                return array($key, array(), self::T_LIST);
-            }
-            elseif ( self::startsWith($val, "{}"))
-            {
-                return array($key, array(), self::T_MAP);
-            }
-            
-            if ( $val )
-            {
-                $valstartswith = $val[0];
-                
-                // quoted value
-                if ('"'==$valstartswith || "'"==$valstartswith || "`"==$valstartswith)
-                {
-                    list($val, $rem) = self::getStr($val, $valstartswith);
-                }
-                else
-                {
-                    $val = self::removeComment($val, '#');
-                }
-            }
-            
-            return array($key, $val, self::T_VAL);
         }
     }
     
@@ -246,47 +266,55 @@ class Custom_Parser
             // if any settings need to be stored, store them in the appropriate buffer
             if ( null !== $ctx->buffer )  
             {
+                list($entry_key,$entry_val,$entry_type) = self::getKeyVal( $line );
+                
                 // main block/directive
-                if ( !$ctx->block  )
+                if ( null === $ctx->block  )
                 {
-                    $keyval = self::getKeyVal( $line );
-                    $currentBlock = $keyval[ 0 ];
+                    $currentBlock = $entry_key;
                     $currentBuffer =& $ctx->buffer;
                     if ( !isset($currentBuffer[ $currentBlock ]) )
-                        $currentBuffer[ $currentBlock ] = $keyval[ 1 ];
-                    $ctx = $ctx->push($currentBuffer, $currentBlock, $keyval[ 2 ]);
+                        $currentBuffer[ $currentBlock ] = $entry_val;
+                    $ctx = $ctx->push($currentBuffer, $currentBlock, $entry_type);
                 }
                 else
                 {
                     if ( self::T_ORDEREDMAP === $ctx->type )
                     {
-                        $keyval = self::getKeyVal( $line );
-                        $kvmap = array(); $kvmap[ $keyval[0] ] = $keyval[1];
-                        $ctx->buffer[ $ctx->block ][] = $kvmap;
-                        $pos = count($ctx->buffer[ $ctx->block ])-1;
+                        $keyval_pair = array(); $keyval_pair[ $entry_key ] = $entry_val;
+                        $index = count($ctx->buffer[ $ctx->block ]);
+                        array_push($ctx->buffer[ $ctx->block ], $keyval_pair);
                         
-                        if ( self::T_LIST === $keyval[2] || self::T_MAP === $keyval[2] || self::T_ORDEREDMAP === $keyval[2] )
+                        if ( self::T_STRUCTURED & $entry_type )
                         {
-                            $ctx = $ctx->push($ctx->buffer[ $ctx->block ][ $pos ], $keyval[0], $keyval[2]);
+                            $ctx = $ctx->push($ctx->buffer[ $ctx->block ][ $index ], $entry_key, $entry_type);
                         }
                     }
                     elseif ( self::T_MAP === $ctx->type )
                     {
-                        $keyval = self::getKeyVal( $line );
-                        $ctx->buffer[ $ctx->block ][ $keyval[0] ] = $keyval[1];
+                        $ctx->buffer[ $ctx->block ][ $entry_key ] = $entry_val;
                         
-                        if ( self::T_LIST === $keyval[2] || self::T_MAP === $keyval[2] || self::T_ORDEREDMAP === $keyval[2] )
+                        if ( self::T_STRUCTURED & $entry_type )
                         {
-                            $ctx = $ctx->push($ctx->buffer[ $ctx->block ], $keyval[0], $keyval[2]);
+                            $ctx = $ctx->push($ctx->buffer[ $ctx->block ], $entry_key, $entry_type);
                         }
                     }
                     else if ( self::T_LIST === $ctx->type )
                     {
-                        $ctx->buffer[ $ctx->block ][] = self::getVal( $line );
+                        if ( self::T_STRUCTURED & $entry_type )
+                        {
+                            $index = count($ctx->buffer[ $ctx->block ]);
+                            array_push($ctx->buffer[ $ctx->block ], $entry_val);
+                            $ctx = $ctx->push($ctx->buffer[ $ctx->block ], $index, $entry_type);
+                        }
+                        else
+                        {
+                            array_push($ctx->buffer[ $ctx->block ], $entry_val);
+                        }
                     }
                     else //if ( self::T_VAL === $ctx->type )
                     {
-                        $ctx->buffer[ $ctx->block ] = self::getVal( $line );
+                        $ctx->buffer[ $ctx->block ] = $entry_val;
                         $ctx = $ctx->pop();
                         if ( !$ctx ) $ctx = self::Context($rootObj, null, self::T_MAP);
                     }
@@ -294,12 +322,6 @@ class Custom_Parser
             }
         }
         return $rootObj;
-    }
-    
-    // alias
-    public static function fromString( $s )
-    {
-        return self::parse( $s );
     }
 }
 Custom_Parser::init();

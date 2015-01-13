@@ -211,7 +211,7 @@
             echo ("                          DEFAULT: uglifyjs");
             echo ("  --enc      ENCODING     set text encoding");
             echo ("                          DEFAULT: utf8");
-            echo(" ");
+            echo (" ");
             
             exit(1);
         }
@@ -233,11 +233,10 @@
         else return file; 
     };
     
-    function create_process_loop(dto, process_list, params)
+    function run_process_loop(dto, params, process_list)
     {
         var cmd, i = 0, l = process_list.length, step = 1;
         var process_loop = function process_loop( err, data ) {
-            var tmp;
             if ( err )
             {
                 params.err = 'Error executing "'+cmd+'"';
@@ -255,15 +254,13 @@
                 if ( i < l )
                 {
                     cmd = process_list[i]
-                            .split( '$dir' ).join( params.basePath )
-                            .split( '$cwd' ).join( params.cwd )
-                            .split( '$tpls' ).join( Beeld.templatesPath )
-                            .split( '$infile' ).join( params.in_tuple )
-                            .split( '$outfile' ).join( params.out_tuple )
+                            .split('${DIR}').join( params.basePath )
+                            .split('${CWD}').join( params.cwd )
+                            .split('${COMPILERS}').join(Beeld.compilersPath)
+                            .split('${TPLS}').join( Beeld.templatesPath )
+                            .split('${IN}').join( params.in_tuple )
+                            .split('${OUT}').join( params.out_tuple )
                         ;
-                    tmp = params.in_tuple;
-                    params.in_tuple = params.out_tuple;
-                    params.out_tuple = tmp;
                     i+=1;
                     exec_async(cmd, null, process_loop);
                     return;
@@ -277,13 +274,13 @@
             {
                 step = 4;
                 cmd = 'read output file for process_loop';
-                read_async(params.in_tuple, params.encoding, process_loop);
+                read_async(params.out_tuple, params.encoding, process_loop);
                 return;
             }
             params.srcText = data;
             dto.next( );
         };
-        return process_loop;
+        return process_loop( null );
     }
     
     DTO = function( params, next, abort ) {
@@ -378,22 +375,22 @@
         self.compilers = {
         'cssmin' : {
             'name' : 'CSS Minifier',
-            'compiler' : 'node __{{PATH}}__cssmin.js __{{EXTRA}}__ __{{OPTIONS}}__ --input __{{INPUT}}__  --output __{{OUTPUT}}__',
+            'compiler' : 'node ${COMPILERS}cssmin.js ${EXTRA} ${OPTIONS} --input ${IN}  --output ${OUT}',
             'options' : ''
         },
         'uglifyjs' : {
             'name' : 'Node UglifyJS Compiler',
-            'compiler' : 'uglifyjs __{{INPUT}}__ __{{OPTIONS}}__ -o __{{OUTPUT}}__',
+            'compiler' : 'uglifyjs ${IN} ${OPTIONS} -o ${OUT}',
             'options' : ''
         },
         'closure' : {
             'name' : 'Java Closure Compiler',
-            'compiler' : 'java -jar __{{PATH}}__closure.jar __{{EXTRA}}__ __{{OPTIONS}}__ --js __{{INPUT}}__ --js_output_file __{{OUTPUT}}__',
+            'compiler' : 'java -jar ${COMPILERS}closure.jar ${EXTRA} ${OPTIONS} --js ${IN} --js_output_file ${OUT}',
             'options' : ''
         },
         'yui' : { 
             'name' : 'Java YUI Compressor Compiler',
-            'compiler' : 'java -jar __{{PATH}}__yuicompressor.jar __{{EXTRA}}__ __{{OPTIONS}}__ --type js -o __{{OUTPUT}}__  __{{INPUT}}__',
+            'compiler' : 'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}',
             'options' : ''
         }
         };
@@ -495,15 +492,15 @@
                 next_task, log_settings, abort_process, finish_process,
                 config = params.config, task_key,
                 default_actions = [
-                     'src'
-                    ,'header'
-                    ,'replace'
-                    ,'preprocess'
-                    ,'doc'
-                    ,'minify'
-                    ,'postprocess'
-                    ,'bundle'
-                    ,'out'
+                 'src'
+                ,'header'
+                ,'replace'
+                ,'preprocess'
+                ,'doc'
+                ,'minify'
+                ,'postprocess'
+                ,'bundle'
+                ,'out'
                 ]
             ;
             
@@ -555,7 +552,7 @@
             params.currentTask = '';
             
             log_settings = function( dto ) {
-                var params = dto.params(), sepLine = new Array(65).join("=");
+                var params = dto.params(), sepLine = new Array(66).join("=");
                 // output the build settings
                 if ( !params.outputToStdOut )
                 {
@@ -657,13 +654,15 @@
         name: 'JSON Parser',
         format: 'JSON Format',
         ext: ".json",
-        path: null,
+        path: Beeld.parsersPath + 'json.js',
         parser: JSON,
         load: function( ) {
-            return JSON;
+            return require( Beeld.Parsers.JSON.path );
         },
         parse: function( text ) {
-            return JSON.parse( text );
+            if ( !Beeld.Parsers.JSON.parser ) 
+                Beeld.Parsers.JSON.parser = Beeld.Parsers.JSON.load( );
+            return Beeld.Parsers.JSON.parser.parse( text );
         }
     }),
     YAML: DynamicObject({
@@ -758,6 +757,9 @@
                     }
                 }
             }
+            // header file is NOT one of the source files
+            if ( headerFile && null === params.headerText )
+                params.headerText = read( getRealPath( headerFile, params.basePath ) );
             params.srcText = buffer.join('');
         }
         return dto.next( );
@@ -801,7 +803,7 @@
         var params = dto.params( ), config = params.config;
         if ( config[HAS]("preprocess") && config.preprocess.length )
         {
-            create_process_loop(dto, [].concat(config.preprocess), params)( null );
+            run_process_loop(dto, params, [].concat(config.preprocess));
         }
         else
         {
@@ -912,11 +914,11 @@
             }
                 
             cmd = selectedCompiler.compiler
-                    .split('__{{PATH}}__').join(Beeld.compilersPath)
-                    .split('__{{EXTRA}}__').join(extra)
-                    .split('__{{OPTIONS}}__').join(selectedCompiler.options)
-                    .split('__{{INPUT}}__').join(params.in_tuple)
-                    .split('__{{OUTPUT}}__').join(params.out_tuple)
+                    .split('${COMPILERS}').join(Beeld.compilersPath)
+                    .split('${EXTRA}').join(extra)
+                    .split('${OPTIONS}').join(selectedCompiler.options)
+                    .split('${IN}').join(params.in_tuple)
+                    .split('${OUT}').join(params.out_tuple)
                 ;
             write_async( params.in_tuple, params.srcText, params.encoding, function( err ){
                 if ( !err )
@@ -967,7 +969,7 @@
         var params = dto.params( ), config = params.config;
         if ( config[HAS]("postprocess") && config.postprocess.length )
         {
-            create_process_loop(dto, [].concat(config.postprocess), params)( null );
+            run_process_loop(dto, params, [].concat(config.postprocess));
         }
         else
         {

@@ -19,9 +19,11 @@ ESC = [
 ]
 
 T_VAL = 1
-T_MAP = 2
-T_LIST = 3
-T_ORDEREDMAP = 4
+T_KEYVAL = 2
+T_MAP = 4
+T_LIST = 8
+T_ORDEREDMAP = 16
+T_STRUCTURED = 28 #T_LIST | T_MAP | T_ORDEREDMAP
 
 RE_NEWLINE = re.compile(r'\n\r|\r\n|\r|\n')
 #RE_BLOCK = re.compile(r'^([a-zA-Z0-9\-_]+)\s*(=\[\{\}\]|=\[\]|=\{\}|=)?')
@@ -46,26 +48,25 @@ def getStr(s, q, and_un_escape=True):
         if q == ch and not esc: break
         esc = not esc and ('\\' == ch)
         quoted += ch
-    rem = s[i:].strip()
+    rem = s[i:]
     if False != and_un_escape:
         for unesc in ESC:
             quoted = quoted.replace( unesc[0], unesc[1] )
         quoted = quoted.replace( '\\\\', '\\' )
-    return [quoted, rem]
+    return [quoted, rem.strip()]
 
 
-def getVal( line ):
-    linestartswith = line[0]
+#def getVal( line ):
+#    linestartswith = line[0]
+#    
+#    # quoted string
+#    if '"'==linestartswith or "'"==linestartswith or "`"==linestartswith:
+#        return getStr(line, linestartswith)[0]
+#    
+#    # un-quoted string
+#    else:
+#        return removeComment(line, '#')
     
-    # quoted string
-    if '"'==linestartswith or "'"==linestartswith or "`"==linestartswith:
-        return getStr(line, linestartswith)[0]
-    
-    # un-quoted string
-    else:
-        return removeComment(line, '#')
-    
-
 
 def getKeyVal( line ):
     linestartswith = line[0]
@@ -76,16 +77,58 @@ def getKeyVal( line ):
         
         # key-value pair
         eq_index = line.find('=', 0)
-        comm_index = line.find('#', 0)
         
-        if -1 < eq_index and (0 > comm_index or eq_index < comm_index):
+        if len(line) and 0 == eq_index:
+            comm_index = line.find('#', 0)
+            if 0 > comm_index or eq_index < comm_index:
+                
+                val = line[eq_index+1:]
+                
+                if val.startswith("[{}]"):
+                
+                    return [key, [], T_ORDEREDMAP]
+                
+                elif val.startswith("[]"):
+                
+                    return [key, [], T_LIST]
+                
+                elif val.startswith("{}"):
+                
+                    return [key, {}, T_MAP]
+                
+                if val:
+                
+                    val = val.strip()
+                    valstartswith = val[0]
+                    
+                    # quoted value
+                    if '"'==valstartswith or "'"==valstartswith or "`"==valstartswith:
+                        val = getStr(val, valstartswith)[0]
+                    else:
+                        val = removeComment(val, '#')
+                        
+            else:
+                val = removeComment(line, '#')
+        
+            return [key, val, T_KEYVAL]
+        
+        else:
+            # just value, no key-val pair
+            return [None, key, T_VAL]
             
+    # un-quoted string
+    else:
+        eq_index = line.find('=', 0)
+        if -1 < eq_index:
+            key = line[0:eq_index].strip()
             val = line[eq_index+1:]
+            
+            if not len(key): key = None
             
             if val.startswith("[{}]"):
             
                 return [key, [], T_ORDEREDMAP]
-            
+                
             elif val.startswith("[]"):
             
                 return [key, [], T_LIST]
@@ -95,7 +138,7 @@ def getKeyVal( line ):
                 return [key, {}, T_MAP]
             
             if val:
-            
+                
                 val = val.strip()
                 valstartswith = val[0]
                 
@@ -105,42 +148,10 @@ def getKeyVal( line ):
                 else:
                     val = removeComment(val, '#')
                     
+            return [key, val, T_KEYVAL]
         else:
-            val = removeComment(line, '#')
-    
-        return [key, val, T_VAL]
-        
-    # un-quoted string
-    else:
-    
-        eq_index = line.find('=', 0)
-        key = line[0:eq_index].strip()
-        val = line[eq_index+1:]
-        
-        if val.startswith("[{}]"):
-        
-            return [key, [], T_ORDEREDMAP]
-            
-        elif val.startswith("[]"):
-        
-            return [key, [], T_LIST]
-        
-        elif val.startswith("{}"):
-        
-            return [key, {}, T_MAP]
-        
-        if val:
-            
-            val = val.strip()
-            valstartswith = val[0]
-            
-            # quoted value
-            if '"'==valstartswith or "'"==valstartswith or "`"==valstartswith:
-                val = getStr(val, valstartswith)[0]
-            else:
-                val = removeComment(val, '#')
-                
-        return [key, val, T_VAL]
+            # just value, no key-val pair
+            return [None, removeComment(line, '#'), T_VAL]
 
 
 class Context():
@@ -203,58 +214,57 @@ class Custom_Parser():
             # if any settings need to be stored, store them in the appropriate buffer
             if ctx.buffer is not None: 
             
+                entry_key,entry_val,entry_type = getKeyVal( line )
+                
                 # main block/directive
                 if ctx.block is None:
                     
-                    keyval = getKeyVal( line )
-                    currentBlock = keyval[ 0 ]
+                    currentBlock = entry_key
                     currentBuffer = ctx.buffer
                     if currentBlock not in currentBuffer:
-                        currentBuffer[ currentBlock ] = keyval[ 1 ]
-                    ctx = ctx.push(currentBuffer, currentBlock, keyval[ 2 ])
+                        currentBuffer[ currentBlock ] = entry_val
+                    ctx = ctx.push(currentBuffer, currentBlock, entry_type)
                 
                 else: 
                     
                     if T_ORDEREDMAP == ctx.type:
                     
-                        keyval = getKeyVal( line )
-                        kvmap = {}
-                        kvmap[ keyval[0] ] = keyval[1]
-                        ctx.buffer[ ctx.block ].append( kvmap )
-                        pos = len(ctx.buffer[ ctx.block ])-1
+                        keyval_pair = {}
+                        keyval_pair[ entry_key ] = entry_val
+                        index = len(ctx.buffer[ ctx.block ])
+                        ctx.buffer[ ctx.block ].append( keyval_pair )
                         
-                        if T_LIST == keyval[2] or T_MAP == keyval[2] or T_ORDEREDMAP == keyval[2]:
-                            
-                            ctx = ctx.push(ctx.buffer[ ctx.block ][ pos ], keyval[0], keyval[2])
+                        if T_STRUCTURED & entry_type:
+                            ctx = ctx.push(ctx.buffer[ ctx.block ][ index ], entry_key, entry_type)
                         
                     
                     elif T_MAP == ctx.type:
                     
-                        keyval = getKeyVal( line )
-                        ctx.buffer[ ctx.block ][ keyval[0] ] = keyval[1]
+                        ctx.buffer[ ctx.block ][ entry_key ] = entry_val
                         
-                        if T_LIST == keyval[2] or T_MAP == keyval[2] or T_ORDEREDMAP == keyval[2]:
-                            
-                            ctx = ctx.push(ctx.buffer[ ctx.block ], keyval[0], keyval[2])
+                        if T_STRUCTURED & entry_type:
+                            ctx = ctx.push(ctx.buffer[ ctx.block ], entry_key, entry_type)
                         
                     
                     elif T_LIST == ctx.type:
                     
-                        ctx.buffer[ ctx.block ].append( getVal( line ) )
+                        if T_STRUCTURED & entry_type:
+                            index = len(ctx.buffer[ ctx.block ])
+                            ctx.buffer[ ctx.block ].append( entry_val )
+                            ctx = ctx.push(ctx.buffer[ ctx.block ], index, entry_type)
+                        else:
+                            ctx.buffer[ ctx.block ].append( entry_val )
+                        
                     
                     else: # elif T_VAL == isType:
                     
-                        ctx.buffer[ ctx.block ] = getVal( line )
+                        ctx.buffer[ ctx.block ] = entry_val
                         ctx = ctx.pop()
                         if ctx is None: ctx = Context(rootObj, None, T_MAP)
                 
         
         return rootObj
 
-        
-
-# alias
-Custom_Parser.fromString = Custom_Parser.parse
             
 # for use with 'import *'
 __all__ = [ 'Custom_Parser' ]

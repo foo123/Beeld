@@ -10,7 +10,6 @@
 ##
 
 import os, tempfile, sys, re
-import json
 
 try:
     import argparse
@@ -242,13 +241,15 @@ class BeeldParsers:
         parsers = BeeldParsers
         
         def JSON_load():
-            return json
+            return import_path(BeeldParsers.JSON.path).Json_Parser
         
         def JSON_parse( text ):
-            return json.loads( text )
+            if not BeeldParsers.JSON.parser:
+                BeeldParsers.JSON.parser = BeeldParsers.JSON.load( )
+            return BeeldParsers.JSON.parser.parse( text )
         
         def YAML_load():
-            return import_path(BeeldParsers.YAML['path']).Yaml_Parser
+            return import_path(BeeldParsers.YAML.path).Yaml_Parser
         
         def YAML_parse( text ):
             if not BeeldParsers.YAML.parser:
@@ -267,8 +268,8 @@ class BeeldParsers:
         'name': 'JSON Parser',
         'format': 'JSON Format',
         'ext': ".json",
-        'path': None,
-        'parser': json,
+        'path': parsers.Path + 'json.py',
+        'parser': None,
         'load': JSON_load,
         'parse': JSON_parse
         })
@@ -295,19 +296,15 @@ class BeeldParsers:
     
 BeeldParsers.init()
 
-def create_process_loop( dto, p, process_list ):
+def run_process_loop( dto, p, process_list ):
     p.process_list = process_list
     p.process_list_count = len(p.process_list)
     p.process_list_index = 0
     write( p.in_tuple, p.srcText, p.encoding )
     def process_loop( ):
-        in_tuple = p.in_tuple
-        out_tuple = p.out_tuple
         if p.process_list_index < p.process_list_count:
-            cmd = p.process_list[p.process_list_index].replace('$dir', p.basePath).replace('$cwd', p.cwd).replace('$tpls', templatesPath).replace('$infile', in_tuple).replace('$outfile', out_tuple)
+            cmd = p.process_list[p.process_list_index].replace('${DIR}', p.basePath).replace('${CWD}', p.cwd).replace('${COMPILERS}', compilersPath).replace('${TPLS}', templatesPath).replace('${IN}', p.in_tuple).replace('${OUT}', p.out_tuple)
 
-            p.in_tuple = out_tuple
-            p.out_tuple = in_tuple
             p.process_list_index += 1
             err = os.system(cmd)
             # on *nix systems this is a tuple, similar to the os.wait return result
@@ -322,11 +319,9 @@ def create_process_loop( dto, p, process_list ):
                 dto.abort()
             else: process_loop( )
         else:
-            p.srcText = read(in_tuple, p.encoding)
-            p.in_tuple = in_tuple
-            p.out_tuple = out_tuple
+            p.srcText = read(p.out_tuple, p.encoding)
             dto.next( )
-    return process_loop
+    return process_loop( )
 
 def create_abort_process( pipeline ):
     def abort_process( params ):
@@ -436,22 +431,22 @@ class Beeld:
         self.compilers = {
         'cssmin' : {
             'name' : 'CSS Minifier',
-            'compiler' : 'python __{{PATH}}__cssmin.py __{{EXTRA}}__ __{{OPTIONS}}__ --input __{{INPUT}}__  --output __{{OUTPUT}}__',
+            'compiler' : 'python ${COMPILERS}cssmin.py ${EXTRA} ${OPTIONS} --input ${IN}  --output ${OUT}',
             'options' : ''
         },
         'uglifyjs' : {
             'name' : 'Node UglifyJS Compiler',
-            'compiler' : 'uglifyjs __{{INPUT}}__ __{{OPTIONS}}__ -o __{{OUTPUT}}__',
+            'compiler' : 'uglifyjs ${IN} ${OPTIONS} -o ${OUT}',
             'options' : ''
         },
         'closure' : {
             'name' : 'Java Closure Compiler',
-            'compiler' : 'java -jar __{{PATH}}__closure.jar __{{EXTRA}}__ __{{OPTIONS}}__ --js __{{INPUT}}__ --js_output_file __{{OUTPUT}}__',
+            'compiler' : 'java -jar ${COMPILERS}closure.jar ${EXTRA} ${OPTIONS} --js ${IN} --js_output_file ${OUT}',
             'options' : ''
         },
         'yui' : {
             'name' : 'Java YUI Compressor Compiler',
-            'compiler' : 'java -jar __{{PATH}}__yuicompressor.jar __{{EXTRA}}__ __{{OPTIONS}}__ --type js -o __{{OUTPUT}}__  __{{INPUT}}__',
+            'compiler' : 'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}',
             'options' : ''
         }
         }
@@ -528,15 +523,15 @@ class Beeld:
         actions = self.actions
         config = params.config
         default_actions = [
-             'src'
-            ,'header'
-            ,'replace'
-            ,'preprocess'
-            ,'doc'
-            ,'minify'
-            ,'postprocess'
-            ,'bundle'
-            ,'out'
+         'src'
+        ,'header'
+        ,'replace'
+        ,'preprocess'
+        ,'doc'
+        ,'minify'
+        ,'postprocess'
+        ,'bundle'
+        ,'out'
         ]
         
         params.in_tuple = None
@@ -623,6 +618,9 @@ class Beeld:
                         params.headerText = buffer[len(buffer)-1]
                         doneheader = True
                 
+            # header file is NOT one of the source files
+            if headerFile and None == params.headerText:
+                params.headerText = read( getRealPath( headerFile, params.basePath ) )
             params.srcText = "".join(buffer)
         
         return dto.next()
@@ -664,7 +662,7 @@ class Beeld:
         params = dto.params( ) 
         config = params.config
         if "preprocess" in config and config['preprocess']:
-            create_process_loop(dto, params, list(config['preprocess']))( )
+            return run_process_loop(dto, params, list(config['preprocess']))
         else:
             return dto.next( )
         
@@ -749,10 +747,7 @@ class Beeld:
                 if not isinstance(opts, list): opts = [opts]
                 params.compilers['cssmin']['options'] = " ".join(opts)
             
-            in_tuple = params.in_tuple
-            out_tuple = params.out_tuple
-            
-            write(in_tuple, params.srcText, params.encoding)
+            write(params.in_tuple, params.srcText, params.encoding)
 
             extra = ''
             # use the selected compiler
@@ -762,7 +757,7 @@ class Beeld:
             elif 'yui'==params.selectedCompiler or 'closure'==params.selectedCompiler:
                 extra = "--charset "+params.encoding
                     
-            cmd = compiler['compiler'].replace('__{{PATH}}__', compilersPath).replace('__{{EXTRA}}__', extra).replace('__{{OPTIONS}}__', compiler['options']).replace('__{{INPUT}}__', in_tuple).replace('__{{OUTPUT}}__', out_tuple)
+            cmd = compiler['compiler'].replace('${COMPILERS}', compilersPath).replace('${EXTRA}', extra).replace('${OPTIONS}', compiler['options']).replace('${IN}', params.in_tuple).replace('${OUT}', params.out_tuple)
             err = os.system(cmd)
             # on *nix systems this is a tuple, similar to the os.wait return result
             # on windows it is an integer
@@ -771,7 +766,7 @@ class Beeld:
             # high-byte is the exit status
             if not (type(err) is int): err = 255 & (err[1]>>8)
             
-            if 0==err: params.srcText = read(out_tuple, params.encoding)
+            if 0==err: params.srcText = read(params.out_tuple, params.encoding)
             
             # some error occured
             if 0!=err: 
@@ -784,7 +779,7 @@ class Beeld:
         params = dto.params( ) 
         config = params.config
         if "postprocess" in config and config['postprocess']:
-            create_process_loop(dto, params, list(config['postprocess']))( )
+            return run_process_loop(dto, params, list(config['postprocess']))
         else:
             return dto.next( )
 
