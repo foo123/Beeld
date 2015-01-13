@@ -1,12 +1,12 @@
 Beeld
 =====
 
-**A scriptable and configurable source code builder framework in Node/Python/PHP**
+**A scriptable and configurable source code builder framework and tool in Node/Python/PHP**
 
-**version 0.5** (*PHP implementation in progress*)
+**version 0.5**
 
 
-This is a new framework/tool for building (source) projects, which is based on (and extends) the [older buildtools here](https://github.com/foo123/scripts)
+This is a new framework and tool for building projects from sources, which is based on (and extends) the [previous buildtools used here](https://github.com/foo123/scripts)
 
 
 ###Usage
@@ -18,7 +18,7 @@ This is a new framework/tool for building (source) projects, which is based on (
 ###How to Use
 
 Each tool/compiler, if run with no parameters in the command-line, will print a help screen explaining usage options.
-Also the sample-dependencies files and build.bat, build.sh files, demonstrate how the build tools are used
+Also the sample-config files and build.bat, build.sh files, demonstrate how the build tools are used
 
 
 ###UMD Templates
