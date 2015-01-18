@@ -5,7 +5,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.5
+*   @version: 0.6
 *
 **/
 !function (root, moduleName, moduleDefinition) {
@@ -93,46 +93,72 @@
         },
         
         fileExt = function( fileName ) { return path.extname(fileName).toString( ); },
-        /*keysToLower = function( obj ) {
-            if ( obj )
-            {
-                var k, tmp;
-                for (k in obj)
-                {
-                    if ( obj[HAS](k) )
-                    {
-                        tmp = obj[k];
-                        delete obj[k];
-                        obj[k.toLowerCase()] = tmp;
-                    }
-                }
-            }
-            return obj;
-        },*/
         
         // needed variables
-        /*CWD = process.cwd( ),*/ DIR = realpath(__dirname), FILE = path.basename(__filename), 
-        TPLS = { }, parseArgs, parseOptions, getRealPath, getTpl, 
-        DynamicObject, DTO, Pipeline, Beeld
+        BEELD_FILE, BEELD_ROOT, BEELD_INCLUDES, BEELD_COMPILERS, BEELD_TEMPLATES, BEELD_PARSERS,
+        TPLS = { }, PublishSubscribe, /*List, Map,*/ OrderedMap, Beeld
     ; 
     
-    DynamicObject = function( properties ) {
-        var obj = new Object();
-        if ( properties )
-        {
-            for (var k in properties)
-            {
-                if ( properties[HAS](k) )
-                    obj[ k ] = properties[ k ];
-            }
-        }
-        return obj;
+    PublishSubscribe = require('./includes/PublishSubscribe');
+    
+    BEELD_FILE = path.basename(__filename);
+    BEELD_ROOT = realpath(__dirname);
+    BEELD_INCLUDES = joinPath(BEELD_ROOT, "includes") + '/';
+    BEELD_COMPILERS = joinPath(BEELD_ROOT, "compilers") + '/';
+    BEELD_TEMPLATES = joinPath(BEELD_ROOT, "templates") + '/';
+    BEELD_PARSERS = joinPath(BEELD_ROOT, "parsers") + '/';
+
+    //List = Array;
+    //Map = Object;
+    OrderedMap = function( om ) {
+        this.om = om;
+        this.index = 0;
     };
+    OrderedMap[PROTO] = {
+        constructor: OrderedMap,
+        om: null,
+        index: 0,
+        
+        hasNext: function( ) {
+            return this.index < this.om.length;
+        },
+        getNext: function( ) {
+            if (this.index < this.om.length)
+            {
+                var obj = this.om[this.index++], key = keys(obj)[0];
+                return {key: key, val: obj[key]};
+            }
+            return null;
+        },
+        getItem: function( index ) {
+            if (index >= 0 && index < this.om.length)
+            {
+                var obj = this.om[index], key = keys(obj)[0];
+                return {key: key, val: obj[key]};
+            }
+            return null;
+        },
+        rewind: function( ) {
+            this.index = 0;
+            return this;
+        }
+    };
+    
+    function multi_replace( tpl, reps )
+    {
+        var out = tpl, i=0, l=reps.length;
+        for (i=0; i<l; i++)
+        {
+            out = out.split(reps[i][0]).join(reps[i][1]);
+        }
+        return out;
+    }
     
     //
     // adapted from node-commander package
     // https://github.com/visionmedia/commander.js/
-    parseArgs = function( args ) {
+    function parseArgs( args ) 
+    {
         var 
             Flags = {}, Options = {},  Params = [],
             optionname = '',  argumentforoption = false,
@@ -185,8 +211,10 @@
         }
         
         return {flags: Flags, options: Options, params: Params};
-    };
-    parseOptions = function( defaults ) {
+    }
+    
+    function parseOptions( defaults ) 
+    {
         // parse args
         var options, parsedargs;
         
@@ -196,7 +224,7 @@
         // if help is set, or no dependencis file, echo help message and exit
         if ( parsedargs.flags['h'] || options['help'] || !options['config'] || !options['config'].length )
         {
-            echo ("usage: "+FILE+" [-h] [--config FILE] [--tasks TASKS] [--compiler COMPILER] [--enc ENCODING]");
+            echo ("usage: "+BEELD_FILE+" [-h] [--config FILE] [--tasks TASKS] [--compiler COMPILER] [--enc ENCODING]");
             echo (" ");
             echo ("Build Source Code Packages (js/css)");
             echo (" ");
@@ -216,14 +244,18 @@
             exit(1);
         }
         return options;
-    };
-    getTpl = function( id, enc ) {
+    }
+    
+    function getTpl( id, enc ) 
+    {
         var tpl, tpl_id = 'tpl_'+id;
-        if ( !TPLS[HAS](tpl_id) ) TPLS[tpl_id] = read( Beeld.templatesPath + id, enc );
+        if ( !TPLS[HAS](tpl_id) ) TPLS[tpl_id] = read( BEELD_TEMPLATES + id, enc );
         tpl = TPLS[tpl_id];
         return tpl.slice( );
-    };
-    getRealPath = function( file, basePath ) { 
+    }
+    
+    function getRealPath( file, basePath ) 
+    { 
         basePath = basePath || '';
         if (
             ''!=basePath && 
@@ -231,16 +263,17 @@
         ) 
             return joinPath(basePath, file); 
         else return file; 
-    };
+    }
     
-    function run_process_loop(dto, params, process_list)
+    function run_process_loop( evt, params, process_list )
     {
         var cmd, i = 0, l = process_list.length, step = 1;
         var process_loop = function process_loop( err, data ) {
             if ( err )
             {
                 params.err = 'Error executing "'+cmd+'"';
-                dto.abort( );
+                evt.abort( );
+                return;
             }
             if ( 1 === step )
             {
@@ -253,14 +286,14 @@
             {
                 if ( i < l )
                 {
-                    cmd = process_list[i]
-                            .split('${DIR}').join( params.basePath )
-                            .split('${CWD}').join( params.cwd )
-                            .split('${COMPILERS}').join(Beeld.compilersPath)
-                            .split('${TPLS}').join( Beeld.templatesPath )
-                            .split('${IN}').join( params.in_tuple )
-                            .split('${OUT}').join( params.out_tuple )
-                        ;
+                    cmd = multi_replace(process_list[i], [
+                     ['${DIR}',          params.basePath]
+                    ,['${CWD}',          params.cwd]
+                    ,['${COMPILERS}',    BEELD_COMPILERS]
+                    ,['${TPLS}',         BEELD_TEMPLATES]
+                    ,['${IN}',           params.in_tuple]
+                    ,['${OUT}',          params.out_tuple]
+                    ]);
                     i+=1;
                     exec_async(cmd, null, process_loop);
                     return;
@@ -278,100 +311,32 @@
                 return;
             }
             params.srcText = data;
-            dto.next( );
+            evt.next( );
         };
-        return process_loop( null );
+        process_loop( null );
     }
-    
-    DTO = function( params, next, abort ) {
-        this._params = params;
-        this._next = next;
-        this._abort = abort;
-    };
-    DTO.Params = DynamicObject;
-    DTO[PROTO] = {
-        constructor: DTO
-        ,_params: null
-        ,_next: null
-        ,_abort: null
-        ,dispose: function( ) {
-            this._params = null;
-            this._next = null;
-            this._abort = null;
-            return this;
-        }
-        ,params: function( ) {
-            return this._params;
-        }
-        ,next: function( ) {
-            if ('function' === typeof this._next )
-                return this._next( this._params );
-            return this._params;
-        }
-        ,abort: function( ) {
-            if ('function' === typeof this._abort )
-                return this._abort( this._params );
-            return this._params;
-        }
-    };
-    Pipeline = function( ) {
-        this._tasks = [ ];
-        this._abort = null;
-    };
-    Pipeline.DTO = DTO;
-    Pipeline.dummyAbort = function( params ) { return params; };
-    Pipeline[PROTO] = {
-        constructor: Pipeline
-        ,_tasks: null
-        ,_abort: null
-        ,dispose: function( ) {
-            this._tasks = null;
-            this._abort = null;
-            return this;
-        }
-        ,add: function( task ) {
-            this._tasks.push( task );
-            return this;
-        }
-        ,abort: function( abortFunc ) {
-            this._abort = abortFunc;
-            return this;
-        }
-        ,run: function( params ) {
-            var self = this, tasks = self._tasks, task, abort;
-            if ( tasks && tasks.length )
-            {
-                task = tasks.shift( );
-                if ('function'===typeof self._abort)
-                    abort = function( params ){ return self._abort( params ); };
-                else
-                    abort = Pipeline.dummyAbort;
-                return task(new DTO(
-                    params, 
-                    function( params ){ return self.run( params ); },
-                    abort
-                ));
-            }
-            return params;
-        }
-    };
     
     Beeld = function Beeld( ) {
         var self = this;
+        
+        self.initPubSub( );
+        
         self.actions = {
-         'action_initially': Beeld.action_initially
-        ,'action_src': Beeld.action_src
-        ,'action_header': Beeld.action_header
-        ,'action_replace': Beeld.action_replace
-        ,'action_preprocess': Beeld.action_preprocess
-        ,'action_doc': Beeld.action_doc
-        ,'action_minify': Beeld.action_minify
-        ,'action_postprocess': Beeld.action_postprocess
-        ,'action_bundle': Beeld.action_bundle
-        ,'action_out': Beeld.action_out
-        ,'action_finally': Beeld.action_finally
+         'action_initially': Beeld.Actions.action_initially
+        ,'action_src': Beeld.Actions.action_src
+        ,'action_header': Beeld.Actions.action_header
+        ,'action_replace': Beeld.Actions.action_replace
+        ,'action_preprocess': Beeld.Actions.action_preprocess
+        ,'action_doc': Beeld.Actions.action_doc
+        ,'action_minify': Beeld.Actions.action_minify
+        ,'action_postprocess': Beeld.Actions.action_postprocess
+        ,'action_bundle': Beeld.Actions.action_bundle
+        ,'action_out': Beeld.Actions.action_out
+        ,'action_finally': Beeld.Actions.action_finally
         };
+        
         self.tasks = [ ];
+        
         self.compilers = {
         'cssmin' : {
             'name' : 'CSS Minifier',
@@ -395,266 +360,22 @@
         }
         };
     };
-    Beeld.VERSION = "0.5";
-    Beeld.Pipeline = Pipeline;
-    Beeld[PROTO] = {
-        constructor: Beeld
-        
-        ,actions: null
-        ,tasks: null
-        ,compilers: null
-        
-        ,dispose: function( ) {
-            var self = this;
-            self.compilers = null;
-            self.actions = null;
-            self.tasks = null;
-            return self;
-        }
-        
-        ,addAction: function( action, handler ) {
-            if ( action && 'function'===typeof handler )
-            {
-                this.actions['action_'+action] = handler;
-            }
-            return this;
-        }
-        
-        ,addTask: function( task, actions ) {
-            if ( task && actions )
-            {
-                this.tasks.push([task, actions]);
-            }
-            return this;
-        }
-        
-        // parse input arguments, options and settings in hash format
-        ,parse: function( ) {
-            var params, config, options,  
-                configurationFile, full_path, ext;
-            
-            params = DynamicObject( );
-            options = parseOptions({
-                'help' : false,
-                'config' : false,
-                'tasks' : false,
-                'compiler' : 'uglifyjs',
-                'enc' : 'utf8'
-            });
-            
-            params.compilers = this.compilers;
-            // fix compiler selection
-            options.compiler = options.compiler.toLowerCase();
-            if ( !params.compilers[HAS](options.compiler) ) options.compiler = 'uglifyjs';
-            
-            // if options are correct continue
-            // get real-dir of deps file
-            full_path = params.configFile = realpath(options.config);
-            params.basePath = dirname(full_path);
-            params.cwd = process.cwd( );
-            params.encoding = options.enc.toLowerCase();
-            params.selectedCompiler = options.compiler;
-            params.selectedTasks = options.tasks ? options.tasks.split(',') : false;
-            
-            // parse config settings
-            ext = fileExt(full_path).toLowerCase();
-            if ( !ext.length ) ext = ".custom";
-            
-            configurationFile = read(params.configFile, params.encoding);
-            // parse dependencies file in JSON format
-            if ( ".json" == ext ) 
-            {
-                params.inputType = Beeld.Parsers.JSON.format + ' (' + Beeld.Parsers.JSON.ext + ')';
-                config = Beeld.Parsers.JSON.parse( configurationFile );
-            }
-            // parse dependencies file in YAML format
-            else if ( ".yml" == ext || ".yaml" == ext )
-            {
-                params.inputType = Beeld.Parsers.YAML.format + ' (' + Beeld.Parsers.YAML.ext + ')';
-                config = Beeld.Parsers.YAML.parse( configurationFile );
-            }
-            // parse dependencies file in custom format
-            else
-            {
-                params.inputType = Beeld.Parsers.CUSTOM.format + ' (' + Beeld.Parsers.CUSTOM.ext + ')';
-                config = Beeld.Parsers.CUSTOM.parse( configurationFile );
-            }
-            config = config||{};
-            params.config = config;
-            //echo(JSON.stringify(params.config, null, 4));
-            //exit(0);
-            return params;
-        }
-
-        ,build: function( params ) {
-            var self = this, pipeline, 
-                tasks = null, actions = self.actions, 
-                next_task, log_settings, abort_process, finish_process,
-                config = params.config, task_key,
-                default_actions = [
-                 'src'
-                ,'header'
-                ,'replace'
-                ,'preprocess'
-                ,'doc'
-                ,'minify'
-                ,'postprocess'
-                ,'bundle'
-                ,'out'
-                ]
-            ;
-            
-            params.in_tuple = null; 
-            params.out_tuple = null;
-            pipeline = new Pipeline( );
-            
-            abort_process = function( ){
-                pipeline.dispose( );
-                pipeline = null;
-                cleanup([params.in_tuple, params.out_tuple]);
-                if ( params.err ) echoStdErr( params.err );
-                params = null;
-                exit( 1 );
-            };
-            
-            if ( config[HAS]('tasks') )
-            {
-                for (var t=0; t<config.tasks.length; t++)
-                {
-                    task_key = keys(config.tasks[t])[0];
-                    self.addTask(task_key, config.tasks[t][task_key]);
-                    if ( params.selectedTasks && -1 < params.selectedTasks.indexOf(task_key) )
-                    {
-                        tasks = tasks || [];
-                        tasks.push( [task_key, config.tasks[t][task_key]] );
-                    }
-                }
-            }
-            if ( !tasks )
-            {
-                if ( false === params.selectedTasks )
-                {
-                    if ( self.tasks.length )
-                        tasks = self.tasks;
-                    else if ( config )
-                        tasks = [['default', config]];
-                }
-            }
-            if ( !tasks )
-            {
-                params.err = 'Task is not defined';
-                abort_process( params );
-            }
-            params.config = {};
-            
-            params.in_tuple = tmpfile( ); 
-            params.out_tuple = tmpfile( );
-            params.currentTask = '';
-            
-            log_settings = function( dto ) {
-                var params = dto.params(), sepLine = new Array(66).join("=");
-                // output the build settings
-                if ( !params.outputToStdOut )
-                {
-                    echo (sepLine);
-                    echo (" Build Package ");
-                    echo (sepLine);
-                    echo (" ");
-                    echo ("Input    : " + params.inputType);
-                    echo ("Encoding : " + params.encoding);
-                    echo ("Task     : " + params.currentTask);
-                    if (params.doMinify)
-                    {
-                        echo ("Minify   : ON");
-                        echo ("Compiler : " + params.compilers[params.selectedCompiler]['name']);
-                    }
-                    else
-                    {
-                        echo ("Minify   : OFF");
-                    }
-                    echo ("Output   : " + params.outFile);
-                    echo (" ");
-                }
-                dto.next( );
-            };
-            finish_process = function( dto ){ 
-                pipeline.dispose( );
-                pipeline = null;
-                cleanup([params.in_tuple, params.out_tuple]);
-                dto.dispose( );
-                params = null;
-            };
-            next_task = function( pipeline, config, tasks, default_actions, actions ) {
-                var nonlocal = {tasks: tasks, i: 0, l: tasks.length};
-                var switch_task = function switch_task( dto ) {
-                    if ( nonlocal.i < nonlocal.l )
-                    {
-                        var task = nonlocal.tasks[nonlocal.i][0], 
-                            config_new = nonlocal.tasks[nonlocal.i][1], 
-                            action, a;
-                        nonlocal.i += 1;
-                        var params = dto.params();
-                        params.config = config_new;
-                        params.currentTask = task;
-                        params.bundleText = null; 
-                        params.headerText = null; 
-                        params.srcText = null;
-                        params.err = false;
-                        if ( config_new[HAS]('out') )
-                        {
-                            params.outFile = getRealPath(config_new.out, params.basePath);
-                            params.outputToStdOut = false;
-                        }
-                        else
-                        {
-                            params.outFile = null;
-                            params.outputToStdOut = true;
-                        }
-                        if ( config_new[HAS]('minify') )
-                        {
-                            params.doMinify = true;
-                        }
-                        else
-                        {
-                            params.doMinify = false;
-                        }
-                        pipeline.add( log_settings );
-                        for (a=0; a<default_actions.length; a++)
-                        {
-                            action = 'action_' + default_actions[a];
-                            if ( actions[HAS](action) ) pipeline.add( actions[ action ] );
-                        }
-                        if ( nonlocal.i < nonlocal.l ) pipeline.add( switch_task );
-                        else pipeline.add( finish_process );
-                        return dto.next( );
-                    }
-                    else
-                    {
-                        return finish_process( dto );
-                    }
-                };
-                return switch_task;
-            };
-            
-            pipeline
-                .abort( abort_process )
-                .add( next_task( pipeline, config, tasks, default_actions, actions ) )
-                .run( params )
-            ;
-            return self;
-        }
-    };
-    Beeld.compilersPath = joinPath(DIR, "compilers") + '/';
-    Beeld.templatesPath = joinPath(DIR, "templates") + '/';
-    Beeld.parsersPath = joinPath(DIR, "parsers") + '/';
-    Beeld.Parsers = {
-    Path: Beeld.parsersPath,
+    Beeld.VERSION = "0.6";
     
-    JSON: DynamicObject({
+    Beeld.OrderedMap = function( om ){
+        return new OrderedMap(om);
+    };
+    
+    //
+    // Beeld default parsers
+    Beeld.Parsers = {
+    Path: BEELD_PARSERS,
+    
+    JSON: PublishSubscribe.Data({
         name: 'JSON Parser',
         format: 'JSON Format',
         ext: ".json",
-        path: Beeld.parsersPath + 'json.js',
+        path: BEELD_PARSERS + 'json.js',
         parser: JSON,
         load: function( ) {
             return require( Beeld.Parsers.JSON.path );
@@ -665,11 +386,11 @@
             return Beeld.Parsers.JSON.parser.parse( text );
         }
     }),
-    YAML: DynamicObject({
+    YAML: PublishSubscribe.Data({
         name: 'Yaml Symfony Parser',
         format: 'Yaml Format',
         ext: ".yml/.yaml",
-        path: Beeld.parsersPath + 'yaml.js',
+        path: BEELD_PARSERS + 'yaml.js',
         parser: null,
         load: function( ) {
             return require( Beeld.Parsers.YAML.path );
@@ -680,11 +401,11 @@
             return Beeld.Parsers.YAML.parser.parse( text );
         }
     }),
-    CUSTOM: DynamicObject({
+    CUSTOM: PublishSubscribe.Data({
         name: 'Custom Parser',
         format: 'Custom Format',
         ext: ".custom/*",
-        path: Beeld.parsersPath + 'custom.js',
+        path: BEELD_PARSERS + 'custom.js',
         parser: null,
         load: function( ) {
             return require( Beeld.Parsers.CUSTOM.path );
@@ -696,11 +417,15 @@
         }
     })
     };
-    Beeld.action_initially = function( dto ) { 
-        return dto.next( );
-    };
-    Beeld.action_src = function( dto ) {
-        var params = dto.params( ), config = params.config,
+    
+    //
+    // Beeld default actions
+    Beeld.Actions = {
+     action_initially: function( evt ) { 
+        evt.next( );
+    }
+    ,action_src: function( evt ) {
+        var params = evt.data.data, config = params.config,
             srcFiles, count, buffer, i, filename, headerFile,
             tplid = '!tpl:', tplidlen = tplid.length, doneheader = false;
             
@@ -762,10 +487,10 @@
                 params.headerText = read( getRealPath( headerFile, params.basePath ) );
             params.srcText = buffer.join('');
         }
-        return dto.next( );
-    };
-    Beeld.action_header = function( dto ) {
-        var params = dto.params( ), headerText = params.headerText;
+        evt.next( );
+    }
+    ,action_header: function( evt ) {
+        var params = evt.data.data, headerText = params.headerText;
         params.headerText = '';
         if ( headerText )
         {
@@ -774,44 +499,38 @@
             else if ( startsWith(headerText, '/*!') )
                 params.headerText = headerText.substr(0, headerText.indexOf("!*/")+3);
         }
-        return dto.next( );
-    };
-    Beeld.action_replace = function( dto ) {
-        var params = dto.params( ), config = params.config;
+        evt.next( );
+    }
+    ,action_replace: function( evt ) {
+        var params = evt.data.data, config = params.config;
         if ( config[HAS]('replace') && config.replace ) 
         {
-            var replace = config.replace, k, i, l = replace.length, rep,
+            var replace = Beeld.OrderedMap(config.replace), rep,
                 hasHeader = !!(params.headerText && params.headerText.length)
             ;
             // ordered map
-            for (i=0; i<l; i++)
+            while ( replace.hasNext( ) )
             {
-                for (k in replace[i])
-                {
-                    if ( replace[i][HAS](k) )
-                    {
-                        rep = replace[i][k];
-                        params.srcText = params.srcText.split(k).join(rep);
-                        if ( hasHeader ) params.headerText = params.headerText.split(k).join(rep);
-                    }
-                }
+                rep = replace.getNext();
+                params.srcText = params.srcText.split(rep.key).join(rep.val);
+                if ( hasHeader ) params.headerText = params.headerText.split(rep.key).join(rep.val);
             }
         }
-        return dto.next( );
-    };
-    Beeld.action_preprocess = function( dto ) { 
-        var params = dto.params( ), config = params.config;
+        evt.next( );
+    }
+    ,action_preprocess: function( evt ) { 
+        var params = evt.data.data, config = params.config;
         if ( config[HAS]("preprocess") && config.preprocess.length )
         {
-            run_process_loop(dto, params, [].concat(config.preprocess));
+            run_process_loop(evt, params, [].concat(config.preprocess));
         }
         else
         {
-            return dto.next( );
+            evt.next( );
         }
-    };
-    Beeld.action_doc = function( dto ) {
-        var params = dto.params( ), config = params.config;
+    }
+    ,action_doc: function( evt ) {
+        var params = evt.data.data, config = params.config;
         if ( config[HAS]('doc') && config['doc'][HAS]('output') )
         {
             var doc = config.doc, 
@@ -872,10 +591,10 @@
             }
             write_async(docFile, docs.join( sep ), params.encoding);
         }
-        return dto.next( );
-    };
-    Beeld.action_minify = function( dto ) {
-        var params = dto.params( ), config = params.config;
+        evt.next( );
+    }
+    ,action_minify: function( evt ) {
+        var params = evt.data.data, config = params.config;
         if ( config[HAS]('minify') && !!params.srcText )
         {
             var minsets = config.minify;
@@ -913,13 +632,13 @@
                 extra = "--charset "+params.encoding;
             }
                 
-            cmd = selectedCompiler.compiler
-                    .split('${COMPILERS}').join(Beeld.compilersPath)
-                    .split('${EXTRA}').join(extra)
-                    .split('${OPTIONS}').join(selectedCompiler.options)
-                    .split('${IN}').join(params.in_tuple)
-                    .split('${OUT}').join(params.out_tuple)
-                ;
+            cmd = multi_replace(selectedCompiler.compiler, [
+             ['${COMPILERS}',    BEELD_COMPILERS]
+            ,['${EXTRA}',        extra]
+            ,['${OPTIONS}',      selectedCompiler.options]
+            ,['${IN}',           params.in_tuple]
+            ,['${OUT}',          params.out_tuple]
+            ]);
             write_async( params.in_tuple, params.srcText, params.encoding, function( err ){
                 if ( !err )
                 {
@@ -935,12 +654,12 @@
                                         if ( !err )
                                         {
                                             params.srcText = data;
-                                            dto.next( );
+                                            evt.next( );
                                         }
                                         else
                                         {
                                             params.err = 'Error reading minified file';
-                                            dto.abort( );
+                                            evt.abort( );
                                         }
                                     });
                                 }, 100);
@@ -948,7 +667,7 @@
                             else
                             {
                                 params.err = 'Error executing "'+cmd+'"';
-                                dto.abort( );
+                                evt.abort( );
                             }
                         });
                     }, 100);
@@ -956,28 +675,28 @@
                 else
                 {
                     params.err = 'Error writing input file for minification';
-                    dto.abort( );
+                    evt.abort( );
                 }
             });
         }
         else
         {
-            return dto.next( );
+            evt.next( );
         }
-    };
-    Beeld.action_postprocess = function( dto ) { 
-        var params = dto.params( ), config = params.config;
+    }
+    ,action_postprocess: function( evt ) { 
+        var params = evt.data.data, config = params.config;
         if ( config[HAS]("postprocess") && config.postprocess.length )
         {
-            run_process_loop(dto, params, [].concat(config.postprocess));
+            run_process_loop(evt, params, [].concat(config.postprocess));
         }
         else
         {
-            return dto.next( );
+            evt.next( );
         }
-    };
-    Beeld.action_bundle = function( dto ) {
-        var params = dto.params( ), config = params.config, bundleFiles, count;
+    }
+    ,action_bundle: function( evt ) {
+        var params = evt.data.data, config = params.config, bundleFiles, count;
         params.bundleText = '';
         if ( config[HAS]('bundle') )
         {
@@ -1001,32 +720,287 @@
             }
             params.bundleText = buffer.join("\n") + "\n";
         }
-        return dto.next( );
-    };
-    Beeld.action_out = function( dto ) {
-        var params = dto.params( ), text;
+        evt.next( );
+    }
+    ,action_out: function( evt ) {
+        var params = evt.data.data, text;
         // write the processed file
         text = params.bundleText + params.headerText + params.srcText;
         params.bundleText=null; params.headerText=null; params.srcText=null;
         if ( params.outputToStdOut ) 
         {
             echo( text );
-            return dto.next( );
+            evt.next( );
         }
         else 
         {
             write_async( params.outFile, text, params.encoding, function(){
-                dto.next( );
+                evt.next( );
             });
         }
+    }
+    ,action_finally: function( evt ) {
+        evt.next( );
+    }
     };
-    Beeld.action_finally = function( dto ) {
-        return dto.next( );
+    
+    
+    // extends/implements PublishSubscribe
+    Beeld[PROTO] = Object.create( PublishSubscribe[PROTO] );
+    
+    Beeld[PROTO].constructor = Beeld;
+        
+    Beeld[PROTO].actions = null;
+    Beeld[PROTO].tasks = null;
+    Beeld[PROTO].compilers = null;
+        
+    Beeld[PROTO].dispose = function( ) {
+        var self = this;
+        self.disposePubSub( );
+        self.compilers = null;
+        self.actions = null;
+        self.tasks = null;
+        return self;
     };
+    
+    Beeld[PROTO].addAction = function( action, handler ) {
+        if ( action && 'function'===typeof handler )
+        {
+            this.actions['action_'+action] = handler;
+        }
+        return this;
+    };
+    
+    Beeld[PROTO].addTask = function( task, actions ) {
+        if ( task && actions )
+        {
+            this.tasks.push([task, actions]);
+        }
+        return this;
+    };
+    
+    // parse input arguments, options and settings in hash format
+    Beeld[PROTO].parse = function( ) {
+        var params, config, options,  
+            configurationFile, full_path, ext;
+        
+        params = PublishSubscribe.Data( );
+        options = parseOptions({
+            'help' : false,
+            'config' : false,
+            'tasks' : false,
+            'compiler' : 'uglifyjs',
+            'enc' : 'utf8'
+        });
+        
+        params.compilers = this.compilers;
+        // fix compiler selection
+        options.compiler = options.compiler.toLowerCase();
+        if ( !params.compilers[HAS](options.compiler) ) options.compiler = 'uglifyjs';
+        
+        // if options are correct continue
+        // get real-dir of deps file
+        full_path = params.configFile = realpath(options.config);
+        params.basePath = dirname(full_path);
+        params.cwd = process.cwd( );
+        params.encoding = options.enc.toLowerCase();
+        params.selectedCompiler = options.compiler;
+        params.selectedTasks = options.tasks ? options.tasks.split(',') : false;
+        
+        // parse config settings
+        ext = fileExt(full_path).toLowerCase();
+        if ( !ext.length ) ext = ".custom";
+        
+        configurationFile = read(params.configFile, params.encoding);
+        // parse dependencies file in JSON format
+        if ( ".json" == ext ) 
+        {
+            params.inputType = Beeld.Parsers.JSON.format + ' (' + Beeld.Parsers.JSON.ext + ')';
+            config = Beeld.Parsers.JSON.parse( configurationFile );
+        }
+        // parse dependencies file in YAML format
+        else if ( ".yml" == ext || ".yaml" == ext )
+        {
+            params.inputType = Beeld.Parsers.YAML.format + ' (' + Beeld.Parsers.YAML.ext + ')';
+            config = Beeld.Parsers.YAML.parse( configurationFile );
+        }
+        // parse dependencies file in custom format
+        else
+        {
+            params.inputType = Beeld.Parsers.CUSTOM.format + ' (' + Beeld.Parsers.CUSTOM.ext + ')';
+            config = Beeld.Parsers.CUSTOM.parse( configurationFile );
+        }
+        config = config||{};
+        params.config = config;
+        //echo(JSON.stringify(params.config, null, 4));
+        //exit(0);
+        return params;
+    };
+
+    Beeld[PROTO].build = function( params ) {
+        var self = this, 
+            tasks = null, actions = self.actions, 
+            next_task, log_settings, abort_process, finish_process,
+            config = params.config, task,
+            default_actions = [
+             'src'
+            ,'header'
+            ,'replace'
+            ,'preprocess'
+            ,'doc'
+            ,'minify'
+            ,'postprocess'
+            ,'bundle'
+            ,'out'
+            ]
+        ;
+        
+        params.in_tuple = null; 
+        params.out_tuple = null;
+        
+        abort_process = function( evt ){
+            if ( evt )
+            {
+                var params = evt.data.data;
+                cleanup([params.in_tuple, params.out_tuple]);
+                if ( params.err ) echoStdErr( params.err );
+                evt.dispose( );
+                params = null;
+            }
+            exit( 1 );
+        };
+        
+        if ( config[HAS]('tasks') )
+        {
+            config.tasks = Beeld.OrderedMap(config.tasks);
+            while (config.tasks.hasNext())
+            {
+                task = config.tasks.getNext();
+                self.addTask(task.key, task.val);
+                if ( params.selectedTasks && -1 < params.selectedTasks.indexOf(task.key) )
+                {
+                    tasks = tasks || [];
+                    tasks.push( [task.key, task.val] );
+                }
+            }
+        }
+        if ( !tasks )
+        {
+            if ( false === params.selectedTasks )
+            {
+                if ( self.tasks.length )
+                    tasks = self.tasks;
+                else if ( config )
+                    tasks = [['default', config]];
+            }
+        }
+        if ( !tasks )
+        {
+            params.err = 'Task is not defined';
+            abort_process( params );
+        }
+        params.config = {};
+        
+        params.in_tuple = tmpfile( ); 
+        params.out_tuple = tmpfile( );
+        params.currentTask = '';
+        params.pipeline = self;
+        
+        log_settings = function( evt ) {
+            var params = evt.data.data, sepLine = new Array(66).join("=");
+            // output the build settings
+            if ( !params.outputToStdOut )
+            {
+                echo (sepLine);
+                echo (" Build Package ");
+                echo (sepLine);
+                echo (" ");
+                echo ("Input    : " + params.inputType);
+                echo ("Encoding : " + params.encoding);
+                echo ("Task     : " + params.currentTask);
+                if (params.doMinify)
+                {
+                    echo ("Minify   : ON");
+                    echo ("Compiler : " + params.compilers[params.selectedCompiler]['name']);
+                }
+                else
+                {
+                    echo ("Minify   : OFF");
+                }
+                echo ("Output   : " + params.outFile);
+                echo (" ");
+            }
+            evt.next( );
+        };
+        finish_process = function( evt ){ 
+            var params = evt.data.data;
+            cleanup([params.in_tuple, params.out_tuple]);
+            evt.dispose( );
+            params = null;
+        };
+        next_task = function( config, tasks, default_actions, actions ) {
+            var nonlocal = {tasks: tasks, i: 0, l: tasks.length};
+            var switch_task = function switch_task( evt ) {
+                if ( nonlocal.i < nonlocal.l )
+                {
+                    var task = nonlocal.tasks[nonlocal.i][0], 
+                        config_new = nonlocal.tasks[nonlocal.i][1], 
+                        action, a;
+                    nonlocal.i += 1;
+                    var params = evt.data.data, pipeline = params.pipeline;
+                    params.config = config_new;
+                    params.currentTask = task;
+                    params.bundleText = null; 
+                    params.headerText = null; 
+                    params.srcText = null;
+                    params.err = false;
+                    if ( config_new[HAS]('out') )
+                    {
+                        params.outFile = getRealPath(config_new.out, params.basePath);
+                        params.outputToStdOut = false;
+                    }
+                    else
+                    {
+                        params.outFile = null;
+                        params.outputToStdOut = true;
+                    }
+                    if ( config_new[HAS]('minify') )
+                    {
+                        params.doMinify = true;
+                    }
+                    else
+                    {
+                        params.doMinify = false;
+                    }
+                    pipeline.on('#actions', log_settings);
+                    for (a=0; a<default_actions.length; a++)
+                    {
+                        action = 'action_' + default_actions[a];
+                        if ( actions[HAS](action) ) pipeline.on('#actions', actions[ action ]);
+                    }
+                    if ( nonlocal.i < nonlocal.l ) pipeline.on('#actions', switch_task);
+                    else pipeline.on('#actions', finish_process);
+                    evt.next( );
+                }
+                else
+                {
+                    finish_process( evt );
+                }
+            };
+            return switch_task;
+        };
+        
+        self
+            .on('#actions', next_task( config, tasks, default_actions, actions ))
+            .pipeline('#actions', params, abort_process)
+        ;
+        return self;
+    };
+    
     Beeld.Main = function( ) {
-        var buildLib = new Beeld( );
+        var builder = new Beeld( );
         // do the process
-        buildLib.build( buildLib.parse( ) ); 
+        builder.build( builder.parse() ); 
     };
 
     // if called from command-line

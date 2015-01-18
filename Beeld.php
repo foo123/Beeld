@@ -6,31 +6,71 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.5
+*   @version: 0.6
 *
 **/
 if (!class_exists('Beeld'))
 {
-class BeeldDynamicObject 
-{ 
-    public function __construct($params=null)
+
+$BEELD_FILE_INFO = pathinfo(__FILE__);
+define('BEELD_FILE', (isset($BEELD_FILE_INFO['extension']) ? $BEELD_FILE_INFO['filename'].'.'.$BEELD_FILE_INFO['extension'] : $BEELD_FILE_INFO['filename']));
+define('BEELD_ROOT', dirname(__FILE__) . DIRECTORY_SEPARATOR);
+define('BEELD_INCLUDES', BEELD_ROOT . 'includes' . DIRECTORY_SEPARATOR);
+define('BEELD_COMPILERS', BEELD_ROOT . 'compilers' . DIRECTORY_SEPARATOR);
+define('BEELD_PARSERS', BEELD_ROOT . 'parsers' . DIRECTORY_SEPARATOR);
+define('BEELD_TEMPLATES', BEELD_ROOT . 'templates' . DIRECTORY_SEPARATOR);
+
+require(BEELD_INCLUDES . 'PublishSubscribe.php');
+
+final class BeeldOrderedMap
+{
+    
+    public $om=null;
+    public $index=0;
+    
+    public function __construct($om)
     {
-        if ( $params )
+        $this->om = $om;
+        $this->index = 0;
+    }
+    
+    public function hasNext()
+    {
+        return ($this->index < count($this->om));
+    }
+    
+    public function getNext()
+    {
+        if ($this->index < count($this->om))
         {
-            foreach ($params as $k=>$v)
-            {
-                $this->{$k} = $v;
-            }
+            $obj = $this->om[$this->index++];
+            $key = reset(array_keys($obj));
+            return array('key'=> $key, 'val'=> $obj[$key]);
         }
+        return null;
+    }
+    
+    public function getItem($index)
+    {
+        if ($index >= 0 && $index < count($this->om))
+        {
+            $obj = $this->om[$index];
+            $key = reset(array_keys($obj));
+            return array('key'=> $key, 'val'=> $obj[$key]);
+        }
+        return null;
+    }
+    
+    public function rewind()
+    {
+        $this->index = 0;
+        return $this;
     }
 }
-
+    
 final class BeeldUtils
 {
-    public static $compilersPath = './';
-    public static $parsersPath = './';
-    public static $templatesPath = './';
-    public static $TPLS = array();
+    public static $TPLS = null;
     
     // simulate python's "startswith" string method
     public static function startsWith($str, $pre, $pos=0) 
@@ -153,8 +193,18 @@ final class BeeldUtils
     {
         $tpl_id = 'tpl_' . $id;
         if ( !isset(self::$TPLS[$tpl_id]) )
-            self::$TPLS[$tpl_id] = self::read( self::$templatesPath . $id );
+            self::$TPLS[$tpl_id] = self::read( BEELD_TEMPLATES . $id );
         return self::$TPLS[$tpl_id];
+    }
+    
+    public static function multi_replace($tpl, $reps)
+    {
+        $out = $tpl;
+        foreach ($reps as $r)
+        {
+            $out = str_replace($r[0], $r[1], $out);
+        }
+        return $out;
     }
     
     /**
@@ -204,10 +254,8 @@ final class BeeldUtils
         )
         {
             // If no dependencies have been passed or help is set, show the help message and exit
-            $p = pathinfo(__FILE__);
-            $FILE=(isset($p['extension'])) ? $p['filename'].'.'.$p['extension'] : $p['filename'];
             
-            self::echo_("usage: $FILE [-h] [--config FILE] [--tasks TASKS] [--compiler COMPILER] [--enc ENCODING]");
+            self::echo_("usage: ".BEELD_FILE." [-h] [--config FILE] [--tasks TASKS] [--compiler COMPILER] [--enc ENCODING]");
             self::echo_(" ");
             self::echo_("Build Source Code Packages (js/css)");
             self::echo_(" ");
@@ -229,15 +277,18 @@ final class BeeldUtils
         return $options;
     }
     
-    public static function process_loop(&$dto, &$p)
+    public static function process_loop($evt, &$p)
     {
         if ($p->process_list_index < $p->process_list_count)
         {
-            $cmd = str_replace(
-                    array('${DIR}', '${CWD}', '${COMPILERS}', '${TPLS}', '${IN}', '${OUT}'), 
-                    array($p->basePath, $p->cwd, self::$compilersPath, self::$templatesPath, $p->in_tuple, $p->out_tuple), 
-                    $p->process_list[$p->process_list_index]
-                );
+            $cmd = BeeldUtils::multi_replace($p->process_list[$p->process_list_index], array(
+             array('${DIR}',        $p->basePath)
+            ,array('${CWD}',        $p->cwd)
+            ,array('${COMPILERS}',  BEELD_COMPILERS)
+            ,array('${TPLS}',       BEELD_TEMPLATES)
+            ,array('${IN}',         $p->in_tuple)
+            ,array('${OUT}',        $p->out_tuple)
+            ));
             // breaks correct shell scripts
             //$cmd = escapeshellcmd( $cmd );
             $p->process_list_index += 1;
@@ -249,29 +300,30 @@ final class BeeldUtils
             {
                 $p->err = 'Error executing "'.$cmd.'"';
                 self::echo_stderr(implode(PHP_EOL, (array)$out));
-                return $dto->abort( );
+                $evt->abort( );
+                return;
             }
-            else return self::process_loop($dto, $p);
+            else self::process_loop($evt, $p);
         }
         else
         {
             $p->srcText = self::read($p->out_tuple);
-            return $dto->next( );
+            $evt->next( );
         }
     }
     
-    public static function run_process_loop(&$dto, &$p, $process_list)
+    public static function run_process_loop($evt, &$p, $process_list)
     {
         $p->process_list =& $process_list;
         $p->process_list_count = count($p->process_list);
         $p->process_list_index = 0;
         BeeldUtils::write( $p->in_tuple, $p->srcText );
-        return self::process_loop($dto, $p);
+        self::process_loop($evt, $p);
     }
     
-    public static function log_settings( &$dto ) 
+    public static function log_settings( $evt ) 
     {
-        $params = $dto->params(); 
+        $params =& $evt->data->data; 
         $sepLine = str_repeat("=", 65);
         // output the build settings
         if ( !$params->outputToStdOut )
@@ -295,32 +347,33 @@ final class BeeldUtils
             self::echo_("Output   : " . $params->outFile);
             self::echo_(" ");
         }
-        return $dto->next( );
+        $evt->next( );
     }
     
-    public static function finish_process( &$dto )
+    public static function finish_process( $evt )
     { 
-        $params = $dto->params();
-        $params->pipeline->dispose( );
-        $params->pipeline = null;
+        $params =& $evt->data->data;
         self::cleanup(array($params->in_tuple, $params->out_tuple));
-        $dto->dispose( );
+        $evt->dispose( );
         $params = null;
     }
     
-    public static function abort_process( &$params )
+    public static function abort_process( $evt=null )
     {
-        $params->pipeline->dispose( );
-        $params->pipeline = null;
-        self::cleanup(array($params->in_tuple, $params->out_tuple));
-        if ( $params->err ) self::echo_stderr( $params->err );
-        $params = null;
+        if ( $evt )
+        {
+            $params =& $evt->data->data;
+            self::cleanup(array($params->in_tuple, $params->out_tuple));
+            if ( $params->err ) self::echo_stderr( $params->err );
+            $evt->dispose( );
+            $params = null;
+        }
         exit( 1 );
     }
     
-    public static function switch_task( &$dto ) 
+    public static function switch_task( $evt ) 
     {
-        $p = $dto->params();
+        $p =& $evt->data->data;
         
         if ( $p->task_index < $p->num_tasks )
         {
@@ -351,19 +404,19 @@ final class BeeldUtils
             {
                 $p->doMinify = false;
             }
-            $p->pipeline->add( array('BeeldUtils', 'log_settings') );
+            $p->pipeline->on('#actions', array('BeeldUtils', 'log_settings'));
             foreach ($p->default_actions as $action)
             {
                 $action = 'action_' . $action;
-                if ( isset($p->actions[$action]) ) $p->pipeline->add( $p->actions[ $action ] );
+                if ( isset($p->actions[$action]) ) $p->pipeline->on('#actions',  $p->actions[ $action ]);
             }
-            if ( $p->task_index < $p->num_tasks ) $p->pipeline->add( array('BeeldUtils', 'switch_task') );
-            else $p->pipeline->add( array('BeeldUtils', 'finish_process') );
-            return $dto->next( );
+            if ( $p->task_index < $p->num_tasks ) $p->pipeline->on('#actions',  array('BeeldUtils', 'switch_task'));
+            else $p->pipeline->on('#actions',  array('BeeldUtils', 'finish_process'));
+            $evt->next( );
         }
         else
         {
-            return self::finish_process( $dto );
+            self::finish_process( $evt );
         }
     }
         
@@ -375,13 +428,13 @@ final class BeeldUtils
     
     public static function init()
     {
-        self::$compilersPath = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'compilers' . DIRECTORY_SEPARATOR;
-        self::$parsersPath = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'parsers' . DIRECTORY_SEPARATOR;
-        self::$templatesPath = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'templates' . DIRECTORY_SEPARATOR;
+        self::$TPLS = array();
     }
 }
 BeeldUtils::init();
 
+//
+// Beeld default parsers
 final class BeeldParsers
 {
     public $Path = './';
@@ -391,9 +444,9 @@ final class BeeldParsers
     
     public function __construct( )
     {
-        $this->Path = BeeldUtils::$parsersPath;
+        $this->Path = BEELD_PARSERS;
         
-        $this->JSON = new BeeldDynamicObject(array(
+        $this->JSON = PublishSubscribe::Data(array(
         'name'=> 'JSON Parser',
         'format'=> 'JSON Format',
         'ext'=> ".json",
@@ -401,7 +454,7 @@ final class BeeldParsers
         'parser'=> null
         ));
         
-        $this->YAML = new BeeldDynamicObject(array(
+        $this->YAML = PublishSubscribe::Data(array(
         'name'=> 'Yaml Symfony Parser',
         'format'=> 'Yaml Format',
         'ext'=> ".yml/.yaml",
@@ -409,7 +462,7 @@ final class BeeldParsers
         'parser'=> null
         ));
         
-        $this->CUSTOM = new BeeldDynamicObject(array(
+        $this->CUSTOM = PublishSubscribe::Data(array(
         'name'=> 'Custom Parser',
         'format'=> 'Custom Format',
         'ext'=> ".custom/*",
@@ -452,147 +505,371 @@ final class BeeldParsers
     }
 }
 
-final class BeeldDTO
+//
+// Beeld default actions
+final class BeeldActions
 {
-    public $_params = null;
-    public $_next = null;
-    public $_abort = null;
+    public static function action_initially($evt)
+    { 
+        $evt->next();
+    }
     
-    public function __construct(&$params=null, $next=null, $abort=null)
+    public static function action_src($evt)
     {
-        $this->_params =& $params;
-        $this->_next = $next;
-        $this->_abort = $abort;
-    }
+        $params =& $evt->data->data;
+        $config = $params->config;
+        $params->srcText = '';
+        $params->headerText = null;
         
-    public function dispose()
-    {
-        $this->_params = null;
-        $this->_next = null;
-        $this->_abort = null;
-        return $this;
-    }
-        
-    public function &params()
-    {
-        return $this->_params;
-    }
-        
-    public function &next()
-    {
-        if ($this->_next && is_callable($this->_next))
+        if ( isset($config['src']) )
         {
-            $r = call_user_func($this->_next, $this->_params);
-            return $r;
+            $srcFiles = (array)$config['src'];
+            $count = count($srcFiles);
         }
-        return $this->_params;
+        else
+        {
+            $srcFiles = null;
+            $count = 0;
+        }
+        
+        if (isset($config['header']))
+        {
+            $headerFile = $config['header'];
+        }
+        else
+        {
+            $headerFile = null;
+        }
+        
+        if ($srcFiles && $count)
+        {
+            $tplid = '!tpl:';
+            $tplidlen = strlen($tplid);
+            $doneheader = false;
+            $buffer = array();
+
+            for ($i=0; $i<$count; $i++)
+            {
+                $filename = $srcFiles[$i];
+                
+                if ( !strlen($filename) ) continue;
+                
+                if ( BeeldUtils::startsWith($filename, $tplid) )
+                    // template file
+                    $buffer[] = BeeldUtils::getTpl( substr($filename, $tplidlen) );
+                else
+                    // src file
+                    $buffer[] = BeeldUtils::read( BeeldUtils::getRealPath( $filename, $params->basePath ) );
+                
+                if ( !$doneheader )
+                {
+                    if ( $headerFile && $filename == $headerFile )
+                    {
+                        $params->headerText = $buffer[count($buffer)-1];
+                        $doneheader = true;
+                    }
+                    elseif ( !$headerFile )
+                    {
+                        $params->headerText = $buffer[count($buffer)-1];
+                        $doneheader = true;
+                    }
+                }
+            }
+            // header file is NOT one of the source files
+            if ( $headerFile && null === $params->headerText )
+                $params->headerText = BeeldUtils::read( BeeldUtils::getRealPath( $headerFile, $params->basePath ) );
+            $params->srcText = implode('', $buffer);
+        }
+        $evt->next();
     }
     
-    public function &abort()
+    public static function action_header($evt)
     {
-        if ($this->_abort && is_callable($this->_abort))
-            return call_user_func($this->_abort, $this->_params);
-        return $this->_params;
+        $params =& $evt->data->data;
+        $headerText = $params->headerText;
+        $params->headerText = '';
+        if ( $headerText )
+        {
+            if (BeeldUtils::startsWith($headerText, '/**'))
+            {
+                $position = strpos($headerText, "**/");
+                $params->headerText = substr($headerText, 0, $position+3);
+            }
+            else if (BeeldUtils::startsWith($headerText, '/*!'))
+            {
+                $position = strpos($headerText, "!*/");
+                $params->headerText = substr($headerText, 0, $position+3);
+            }
+        }
+        $evt->next();
+    }
+    
+    public static function action_replace($evt)
+    {
+        $params =& $evt->data->data;
+        $config = $params->config;
+        if ( isset($config['replace']) )
+        {
+            // ordered map
+            $replace = Beeld::OrderedMap($config['replace']);
+            $hasHeader = ($params->headerText && strlen($params->headerText)) ? true : false;
+            
+            while ($replace->hasNext())
+            {
+                $rep = $replace->getNext();
+                $params->srcText = str_replace($rep['key'], $rep['val'], $params->srcText);
+                if ( $hasHeader )
+                    $params->headerText = str_replace($rep['key'], $rep['val'], $params->headerText);
+            }
+        }
+        $evt->next();
+    }
+    
+    public static function action_preprocess($evt)
+    { 
+        $params =& $evt->data->data; 
+        $config = $params->config;
+        if ( isset($config["preprocess"]) )
+        {
+            BeeldUtils::run_process_loop($evt, $params, (array)$config['preprocess']);
+        }
+        else
+        {
+            $evt->next( );
+        }
+    }
+    
+    public static function action_doc($evt)
+    {
+        $params =& $evt->data->data;
+        $config = $params->config;
+        if ( isset($config['doc']) )
+        {
+            $doc = (array)$config['doc'];
+            if ( isset($doc['output']) )
+            {
+                $docFile = BeeldUtils::getRealPath($doc['output'], $params->basePath);
+                $startDoc = $doc['startdoc'];
+                $endDoc = $doc['enddoc'];
+                $isRegex = 0;
+                $_trim = null;
+                $_trimlen = 0;
+                $docs = array();
+                $sep = isset($doc['separator']) ? $doc['separator'] : "\n\n";
+                    
+                if (isset($doc['trimx']))
+                {
+                    $isRegex = 1;
+                    $_trim = '/^' . str_replace('/', '\\/', $doc['trimx']) . '/';
+                }
+                elseif (isset($doc['trim']))
+                {
+                    $isRegex = 0;
+                    $_trim = $doc['trim'];
+                    $_trimlen = strlen($_trim);
+                }
+                
+                // extract doc blocks
+                $blocks = explode( $startDoc, $params->srcText );
+                foreach ($blocks as $b=>$block)
+                {
+                    $tmp = explode( $endDoc, $block );
+                    if ( isset($tmp[1]) )
+                    {
+                        $docs[] = $tmp[0];
+                    }
+                }
+                $blocks = null;
+                
+                // trim start of each doc block line
+                if ($_trim)
+                {
+                    foreach ($docs as $i=>$d)
+                    {
+                        $tmp = explode( "\n", $d );
+                        foreach ($tmp as $j=>$t)
+                        {
+                            if (strlen($t))
+                            {
+                                if ($isRegex)
+                                {
+                                    $tmp[$j] = preg_replace($_trim, '', $tmp[$j]);
+                                }
+                                elseif ($_trim == substr($tmp[$j], 0, $_trimlen))
+                                {
+                                    $tmp[$j] = substr($tmp[$j], $_trimlen);
+                                }
+                            }
+                        }
+                        $docs[$i] = implode( "\n", $tmp );
+                    }
+                }
+                BeeldUtils::write($docFile, implode( $sep, $docs ));
+            }
+        }
+        $evt->next();
+    }
+    
+    public static function action_minify($evt)
+    {
+        $params =& $evt->data->data;
+        $config = $params->config;
+        if ( isset($config['minify']) && !empty($params->srcText) )
+        {
+            $minsets = (array)$config['minify'];
+            
+            if (isset($minsets['uglifyjs']))
+                $params->compilers['uglifyjs']['options'] = implode(" ", (array)$minsets['uglifyjs']);
+            if (isset($minsets['closure']))
+                $params->compilers['closure']['options'] = implode(" ", (array)$minsets['closure']);
+            if (isset($minsets['yui']))
+                $params->compilers['yui']['options'] = implode(" ", (array)$minsets['yui']);
+            if (isset($minsets['cssmin']))
+                $params->compilers['cssmin']['options'] = implode(" ", (array)$minsets['cssmin']);
+            
+            BeeldUtils::write($params->in_tuple, $params->srcText);
+            
+            $extra = '';
+            // use the selected compiler
+            $compiler = $params->compilers[$params->selectedCompiler];
+            if ('cssmin' === $params->selectedCompiler && false === strpos($compiler['options'], "--basepath"))
+            {
+                $extra = "--basepath=".$params->basePath;
+            }
+            elseif ('yui' === $params->selectedCompiler || 'closure' === $params->selectedCompiler)
+            {
+                $extra = "--charset ".$params->encoding;
+            }
+            
+            $cmd = BeeldUtils::multi_replace($compiler['compiler'], array(
+             array('${COMPILERS}',       BEELD_COMPILERS)
+            ,array('${EXTRA}',           $extra)
+            ,array('${OPTIONS}',         $compiler['options'])
+            ,array('${IN}',              $params->in_tuple)
+            ,array('${OUT}',             $params->out_tuple)
+            ));
+            
+            //$cmd = escapeshellcmd( $cmd );
+            exec($cmd . ' 2>&1', $out=array(), $err=0);
+            
+            // some error occured
+            if ( $err ) 
+            {
+                $params->err = 'Error executing "'.$cmd.'"';
+                BeeldUtils::echo_stderr(implode(PHP_EOL, (array)$out));
+                $evt->abort( );
+                return;
+            }
+            else
+            {
+                $params->srcText = BeeldUtils::read($params->out_tuple);
+            }
+        }
+        $evt->next( );
+    }
+    
+    public static function action_postprocess($evt)
+    { 
+        $params =& $evt->data->data; 
+        $config = $params->config;
+        if ( isset($config["postprocess"]) )
+        {
+            BeeldUtils::run_process_loop($evt, $params, (array)$config['postprocess']);
+        }
+        else
+        {
+            $evt->next( );
+        }
+    }
+
+    public static function action_bundle($evt)
+    {
+        $params =& $evt->data->data;
+        $config = $params->config;
+        $params->bundleText = '';
+        if ( isset($config['bundle']) )
+        {
+            $bundleFiles = (array)$config['bundle'];
+            $count = count($bundleFiles);
+        }
+        else
+        {
+            $bundleFiles = null;
+            $count = 0;
+        }
+    
+        if ($bundleFiles && $count)
+        {
+            $buffer = array();
+
+            for ($i=0; $i<$count; $i++)
+            {
+                $filename = $bundleFiles[$i];
+                if ( empty($filename) ) continue;
+                $buffer[] = BeeldUtils::read(BeeldUtils::getRealPath($filename, $params->basePath));
+            }
+            $params->bundleText = implode("\n", $buffer) . "\n";
+        }
+        $evt->next();
+    }
+    
+    public static function action_out($evt)
+    { 
+        $params =& $evt->data->data;
+        // write the processed file
+        $text = $params->bundleText . $params->headerText . $params->srcText;
+        $params->bundleText=null; $params->headerText=null; $params->srcText=null;
+        if ( $params->outputToStdOut ) echo ($text);
+        else BeeldUtils::write($params->outFile, $text);
+        $evt->next();
+    }
+    
+    public static function action_finally($evt)
+    { 
+        $evt->next();
     }
 }
 
-final class BeeldPipeline
+// extends/implements PublishSubscribe
+class Beeld extends PublishSubscribe
 {
-    public $_tasks = null;
-    public $_abort = null;
-    
-    public static function DTO(&$params=null, $next=null, $abort=null)
-    {
-        return new BeeldDTO($params, $next, $abort);
-    }
-    
-    public static function &dummyAbort(&$params)
-    {
-        return $params;
-    }
-    
-    public function __construct()
-    {
-        $this->_tasks = array();
-        $this->_abort = null;
-    }
-    
-    public function dispose()
-    {
-        $this->_tasks = null;
-        $this->_abort = null;
-        return $this;
-    }
-        
-    public function add($task)
-    {
-        $this->_tasks[] = $task;
-        return $this;
-    }
-        
-    public function abort($abortFunc)
-    {
-        $this->_abort = $abortFunc;
-        return $this;
-    }
-        
-    public function &run(&$params)
-    {
-        $tasks =& $this->_tasks;
-        if ( !empty($tasks) )
-        {
-            $task = array_shift($tasks);
-            $next = array(&$this, 'run');
-            if ( $this->_abort && is_callable($this->_abort) )
-                $abort = $this->_abort;
-            else
-                $abort = array('BeeldPipeline', 'dummyAbort');
-                
-            if ( $task && is_callable($task) ) 
-            {
-                $r = call_user_func($task, self::DTO($params, $next, $abort));
-                return $r;
-            }
-        }
-        return $params;
-    }
-}        
-    
-class Beeld
-{
-    const VERSION = "0.5";
+    const VERSION = "0.6";
     public static $Parsers = null;
     
     public $compilers = null;
     public $tasks = null;
     public $actions = null;
     
+    public static function OrderedMap($om)
+    {
+        return new BeeldOrderedMap($om);
+    }
+    
     public static function init( )
     {
         self::$Parsers = new BeeldParsers();
     }
     
-    public static function Pipeline( )
-    {
-        return new BeeldPipeline();
-    }
-    
     public function __construct()
     {
+        $this->initPubSub( ); 
+        
         $this->actions = array(
-         'action_initially'=> array('Beeld', 'action_initially')
-        ,'action_src'=> array('Beeld', 'action_src')
-        ,'action_header'=> array('Beeld', 'action_header')
-        ,'action_replace'=> array('Beeld', 'action_replace')
-        ,'action_preprocess'=> array('Beeld', 'action_preprocess')
-        ,'action_doc'=> array('Beeld', 'action_doc')
-        ,'action_minify'=> array('Beeld', 'action_minify')
-        ,'action_postprocess'=> array('Beeld', 'action_postprocess')
-        ,'action_bundle'=> array('Beeld', 'action_bundle')
-        ,'action_out'=> array('Beeld', 'action_out')
-        ,'action_finally'=> array('Beeld', 'action_finally')
+         'action_initially'=> array('BeeldActions', 'action_initially')
+        ,'action_src'=> array('BeeldActions', 'action_src')
+        ,'action_header'=> array('BeeldActions', 'action_header')
+        ,'action_replace'=> array('BeeldActions', 'action_replace')
+        ,'action_preprocess'=> array('BeeldActions', 'action_preprocess')
+        ,'action_doc'=> array('BeeldActions', 'action_doc')
+        ,'action_minify'=> array('BeeldActions', 'action_minify')
+        ,'action_postprocess'=> array('BeeldActions', 'action_postprocess')
+        ,'action_bundle'=> array('BeeldActions', 'action_bundle')
+        ,'action_out'=> array('BeeldActions', 'action_out')
+        ,'action_finally'=> array('BeeldActions', 'action_finally')
         );
+        
         $this->tasks = array();
+        
         $this->compilers = array(
         'cssmin' => array(
             'name' => 'CSS Minifier',
@@ -619,6 +896,7 @@ class Beeld
     
     public function dispose( ) 
     {
+        $this->disposePubSub();
         $this->compilers = null;
         $this->actions = null;
         $this->tasks = null;
@@ -644,7 +922,7 @@ class Beeld
         
     public function &parse( )
     {
-        $params = new BeeldDynamicObject();
+        $params = PublishSubscribe::Data();
         $options = BeeldUtils::parseOptions(array(
             'h' => false,
             'help' => false,
@@ -727,19 +1005,18 @@ class Beeld
         
         $params->in_tuple = null; 
         $params->out_tuple = null;
-        $pipeline = self::Pipeline( );
-        $params->pipeline =& $pipeline;
         
         if ( isset($config['tasks']) )
         {
-            foreach ((array)$config['tasks'] as $taskDef)
+            $config['tasks'] = Beeld::OrderedMap($config['tasks']);
+            while ($config['tasks']->hasNext())
             {
-                $task_key = reset(array_keys($taskDef));
-                $this->addTask($task_key, $taskDef[$task_key]);
-                if ( $params->selectedTasks && in_array($task_key, $params->selectedTasks) )
+                $task = $config['tasks']->getNext();
+                $this->addTask($task['key'], $task['val']);
+                if ( $params->selectedTasks && in_array($task['key'], $params->selectedTasks) )
                 {
                     if ( !$tasks ) $tasks = array();
-                    $tasks[] = array($task_key, &$taskDef[$task_key]);
+                    $tasks[] = array($task['key'], $task['val']);
                 }
             }
         }
@@ -756,7 +1033,7 @@ class Beeld
         if ( !$tasks )
         {
             $params->err = 'Task is not defined';
-            BeeldUtils::abort_process( $params );
+            BeeldUtils::abort_process( );
         }
         
         $params->in_tuple = BeeldUtils::tmpfile( );
@@ -767,340 +1044,20 @@ class Beeld
         $params->num_tasks = count($tasks);
         $params->actions =& $actions;
         $params->default_actions =& $default_actions;
+        $params->pipeline =& $this;
         
-        $pipeline
-            ->abort( array('BeeldUtils', 'abort_process') )
-            ->add( array('BeeldUtils', 'switch_task') )
-            ->run( $params )
+        $this
+            ->on('#actions', array('BeeldUtils', 'switch_task'))
+            ->pipeline('#actions', &$params, array('BeeldUtils', 'abort_process'))
         ;
         return $this;
     }
     
-    
-    public static function action_initially(&$dto)
-    { 
-        return $dto->next();
-    }
-    
-    public static function action_src(&$dto)
-    {
-        $params = $dto->params();
-        $config = $params->config;
-        $params->srcText = '';
-        $params->headerText = null;
-        
-        if ( isset($config['src']) )
-        {
-            $srcFiles = (array)$config['src'];
-            $count = count($srcFiles);
-        }
-        else
-        {
-            $srcFiles = null;
-            $count = 0;
-        }
-        
-        if (isset($config['header']))
-        {
-            $headerFile = $config['header'];
-        }
-        else
-        {
-            $headerFile = null;
-        }
-        
-    
-        if ($srcFiles && $count)
-        {
-            $tplid = '!tpl:';
-            $tplidlen = strlen($tplid);
-            $doneheader = false;
-            $buffer = array();
-
-            for ($i=0; $i<$count; $i++)
-            {
-                $filename = $srcFiles[$i];
-                
-                if ( !strlen($filename) ) continue;
-                
-                if ( BeeldUtils::startsWith($filename, $tplid) )
-                    // template file
-                    $buffer[] = BeeldUtils::getTpl( substr($filename, $tplidlen) );
-                else
-                    // src file
-                    $buffer[] = BeeldUtils::read( BeeldUtils::getRealPath( $filename, $params->basePath ) );
-                
-                if ( !$doneheader )
-                {
-                    if ( $headerFile && $filename == $headerFile )
-                    {
-                        $params->headerText = $buffer[count($buffer)-1];
-                        $doneheader = true;
-                    }
-                    elseif ( !$headerFile )
-                    {
-                        $params->headerText = $buffer[count($buffer)-1];
-                        $doneheader = true;
-                    }
-                }
-            }
-            // header file is NOT one of the source files
-            if ( $headerFile && null === $params->headerText )
-                $params->headerText = BeeldUtils::read( BeeldUtils::getRealPath( $headerFile, $params->basePath ) );
-            $params->srcText = implode('', $buffer);
-        }
-        return $dto->next();
-    }
-    
-    public static function action_header(&$dto)
-    {
-        $params = $dto->params();
-        $headerText = $params->headerText;
-        $params->headerText = '';
-        if ( $headerText )
-        {
-            if (BeeldUtils::startsWith($headerText, '/**'))
-            {
-                $position = strpos($headerText, "**/");
-                $params->headerText = substr($headerText, 0, $position+3);
-            }
-            else if (BeeldUtils::startsWith($headerText, '/*!'))
-            {
-                $position = strpos($headerText, "!*/");
-                $params->headerText = substr($headerText, 0, $position+3);
-            }
-        }
-        return $dto->next();
-    }
-    
-    public static function action_replace(&$dto)
-    {
-        $params = $dto->params();
-        $config = $params->config;
-        if ( isset($config['replace']) )
-        {
-            $replace = $config['replace'];
-            // ordered map
-            $l = count($replace);
-            $hasHeader = ($params->headerText && strlen($params->headerText)) ? true : false;
-            
-            foreach ($replace as $repl)
-            {
-                $rep = array_keys($repl);  $sub = array_values($repl);
-                $params->srcText = str_replace($rep, $sub, $params->srcText);
-                if ( $hasHeader )
-                    $params->headerText = str_replace($rep, $sub, $params->headerText);
-            }
-        }
-        return $dto->next();
-    }
-    
-    public static function action_preprocess(&$dto)
-    { 
-        $params = $dto->params( ); 
-        $config = $params->config;
-        if ( isset($config["preprocess"]) )
-        {
-            return BeeldUtils::run_process_loop($dto, $params, (array)$config['preprocess']);
-        }
-        else
-        {
-            return $dto->next( );
-        }
-    }
-    
-    public static function action_doc(&$dto)
-    {
-        $params = $dto->params();
-        $config = $params->config;
-        if ( isset($config['doc']) )
-        {
-            $doc = (array)$config['doc'];
-            if ( isset($doc['output']) )
-            {
-                $docFile = BeeldUtils::getRealPath($doc['output'], $params->basePath);
-                $startDoc = $doc['startdoc'];
-                $endDoc = $doc['enddoc'];
-                $isRegex = 0;
-                $_trim = null;
-                $_trimlen = 0;
-                $docs = array();
-                $sep = isset($doc['separator']) ? $doc['separator'] : "\n\n";
-                    
-                if (isset($doc['trimx']))
-                {
-                    $isRegex = 1;
-                    $_trim = '/^' . str_replace('/', '\\/', $doc['trimx']) . '/';
-                }
-                elseif (isset($doc['trim']))
-                {
-                    $isRegex = 0;
-                    $_trim = $doc['trim'];
-                    $_trimlen = strlen($_trim);
-                }
-                
-                // extract doc blocks
-                $blocks = explode( $startDoc, $params->srcText );
-                foreach ($blocks as $b=>$block)
-                {
-                    $tmp = explode( $endDoc, $block );
-                    if ( isset($tmp[1]) )
-                    {
-                        $docs[] = $tmp[0];
-                    }
-                }
-                $blocks = null;
-                
-                // trim start of each doc block line
-                if ($_trim)
-                {
-                    foreach ($docs as $i=>$d)
-                    {
-                        $tmp = explode( "\n", $d );
-                        foreach ($tmp as $j=>$t)
-                        {
-                            if (strlen($t))
-                            {
-                                if ($isRegex)
-                                {
-                                    $tmp[$j] = preg_replace($_trim, '', $tmp[$j]);
-                                }
-                                elseif ($_trim == substr($tmp[$j], 0, $_trimlen))
-                                {
-                                    $tmp[$j] = substr($tmp[$j], $_trimlen);
-                                }
-                            }
-                        }
-                        $docs[$i] = implode( "\n", $tmp );
-                    }
-                }
-                BeeldUtils::write($docFile, implode( $sep, $docs ));
-            }
-        }
-        return $dto->next();
-    }
-    
-    public static function action_minify(&$dto)
-    {
-        $params = $dto->params();
-        $config = $params->config;
-        if ( isset($config['minify']) && !empty($params->srcText) )
-        {
-            $minsets = (array)$config['minify'];
-            
-            if (isset($minsets['uglifyjs']))
-                $params->compilers['uglifyjs']['options'] = implode(" ", (array)$minsets['uglifyjs']);
-            if (isset($minsets['closure']))
-                $params->compilers['closure']['options'] = implode(" ", (array)$minsets['closure']);
-            if (isset($minsets['yui']))
-                $params->compilers['yui']['options'] = implode(" ", (array)$minsets['yui']);
-            if (isset($minsets['cssmin']))
-                $params->compilers['cssmin']['options'] = implode(" ", (array)$minsets['cssmin']);
-            
-            BeeldUtils::write($params->in_tuple, $params->srcText);
-            
-            $extra = '';
-            // use the selected compiler
-            $compiler = $params->compilers[$params->selectedCompiler];
-            if ('cssmin' === $params->selectedCompiler && false === strpos($compiler['options'], "--basepath"))
-            {
-                $extra = "--basepath=".$params->basePath;
-            }
-            elseif ('yui' === $params->selectedCompiler || 'closure' === $params->selectedCompiler)
-            {
-                $extra = "--charset ".$params->encoding;
-            }
-            
-            $cmd = str_replace(
-                    array('${COMPILERS}', '${EXTRA}', '${OPTIONS}', '${IN}', '${OUT}'), 
-                    array(BeeldUtils::$compilersPath, $extra, $compiler['options'], $params->in_tuple, $params->out_tuple), 
-                    $compiler['compiler']
-                );
-            
-            //$cmd = escapeshellcmd( $cmd );
-            exec($cmd . ' 2>&1', $out=array(), $err=0);
-            
-            // some error occured
-            if ( $err ) 
-            {
-                $params->err = 'Error executing "'.$cmd.'"';
-                BeeldUtils::echo_stderr(implode(PHP_EOL, (array)$out));
-                return $dto->abort( );
-            }
-            else
-            {
-                $params->srcText = BeeldUtils::read($params->out_tuple);
-            }
-        }
-        return $dto->next( );
-    }
-    
-    public static function action_postprocess(&$dto)
-    { 
-        $params = $dto->params( ); 
-        $config = $params->config;
-        if ( isset($config["postprocess"]) )
-        {
-            return BeeldUtils::run_process_loop($dto, $params, (array)$config['postprocess']);
-        }
-        else
-        {
-            return $dto->next( );
-        }
-    }
-
-    public static function action_bundle(&$dto)
-    {
-        $params = $dto->params();
-        $config = $params->config;
-        $params->bundleText = '';
-        if ( isset($config['bundle']) )
-        {
-            $bundleFiles = (array)$config['bundle'];
-            $count = count($bundleFiles);
-        }
-        else
-        {
-            $bundleFiles = null;
-            $count = 0;
-        }
-    
-        if ($bundleFiles && $count)
-        {
-            $buffer = array();
-
-            for ($i=0; $i<$count; $i++)
-            {
-                $filename = $bundleFiles[$i];
-                if ( empty($filename) ) continue;
-                $buffer[] = BeeldUtils::read(BeeldUtils::getRealPath($filename, $params->basePath));
-            }
-            $params->bundleText = implode("\n", $buffer) . "\n";
-        }
-        return $dto->next();
-    }
-    
-    public static function action_out(&$dto)
-    { 
-        $params = $dto->params();
-        // write the processed file
-        $text = $params->bundleText . $params->headerText . $params->srcText;
-        $params->bundleText=null; $params->headerText=null; $params->srcText=null;
-        if ( $params->outputToStdOut ) echo ($text);
-        else BeeldUtils::write($params->outFile, $text);
-        return $dto->next();
-    }
-    
-    public static function action_finally(&$dto)
-    { 
-        return $dto->next();
-    }
-
     public static function Main()
     {
         // do the process
-        $buildLib = new Beeld();
-        $buildLib->build( $buildLib->parse() );
+        $builder = new Beeld();
+        $builder->build( $builder->parse() );
     }
 }
 Beeld::init();

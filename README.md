@@ -3,7 +3,7 @@ Beeld
 
 **A scriptable and configurable source code builder framework and tool in Node/Python/PHP**
 
-**version 0.5**
+**version 0.6**
 
 
 This is a new framework and tool for building projects from sources, which is based on (and extends) the [previous buildtools used here](https://github.com/foo123/scripts)
