@@ -1,116 +1,84 @@
 {
-    "tasks" : [
+"plugins":[
+    {"doc": "!plg:doc"}
+],
+
+"tasks":[
+    
+    {"build":[
         
-        {"task1" : {
-            "bundle" : [
-                "./deps/dependency1.js"
-                ,"./deps/dependency1.js"
-            ],
-
-            "src" : [
-                "!tpl:umd-header.tpl.js"
-                ,"../src/file1.js"
-                ,"../src/file2.js"
-                ,"!tpl:umd-footer.tpl.js"
-            ],
-            
-            "header" : "../src/file1.js",
-            
-            "replace" : [
-                {"a" : "b"},
-                {"c" : "d"}
-            ],
-            
-            "preprocess" : [
-            ],
-            
-            "doc" : {
-                "startdoc" : "/**[DOC_MARKUP]",
-                "enddoc" : "[/DOC_MARKUP]**/",
-                "trim" : "* ",
-                "trimx" : "\\s*\\*",
-                "separator" : "\n\n=====================================================\n\n",
-                "output" : "../doc/manual.md"
-            },
-            
-            "minify" : {
-                "yui" : [
-                    "--preserve-semi"
-                ],
-                
-                "closure" : [
-                    "--language_in=ECMASCRIPT5_STRICT"
-                ],
-                
-                "uglifyjs" : [
-                    "-m -c"
-                ],
-                
-                "cssmin" : [
-                    "--embed-images"
-                ]
-            },
-
-            "postprocess" : [
-            ],
-            
-            "out" : "../build/package_output.min.js"
-            }
-        },
+        {"src":[
+             "!tpl:umd-header-single.tpl.js"
+            ,"./src/header.js"
+            ,"./src/utils.js"
+            ,"./src/event.js"
+            ,"./src/pb.js"
+            ,"./src/cache.js"
+            ,"./src/types.js"
+            ,"./src/model.js"
+            ,"./src/view.js"
+            ,"./src/footer.js"
+            ,"./src/jquery.modelview.js"
+            ,"!tpl:umd-footer.tpl.js"
+        ]},
         
-        {"task2" : {
-            "bundle" : [
-                "./deps/dependency2.js"
-                ,"./deps/dependency2.js"
-            ],
-
-            "src" : [
-                "!tpl:umd-header.tpl.js"
-                ,"../src/file3.js"
-                ,"../src/file4.js"
-                ,"!tpl:umd-footer.tpl.js"
-            ],
-            
-            "header" : "../src/file3.js",
-            
-            "replace" : [
-                {"a" : "b"},
-                {"c" : "d"}
-            ],
-            
-            "preprocess" : [  ],
-            
-            "doc" : {
-                "startdoc" : "/**[DOC_MARKUP]",
-                "enddoc" : "[/DOC_MARKUP]**/",
-                "trim" : "* ",
-                "trimx" : "\\s*\\*",
-                "separator" : "\n\n=====================================================\n\n",
-                "output" : "../doc/manual2.md"
-            },
-            
-            "minify" : {
-                "yui" : [
-                    "--preserve-semi"
-                ],
-                
-                "closure" : [
-                    "--language_in=ECMASCRIPT5_STRICT"
-                ],
-                
-                "uglifyjs" : [
-                    "-m -c"
-                ],
-                
-                "cssmin" : [
-                    "--embed-images"
-                ]
-            },
-
-            "postprocess" : [ ],
-            
-            "out" : "../build/package_output.min.js"
-            }
-        }
-    ]
+        {"header": "./src/header.js"},
+        
+        {"replace":[
+             {"@@ROOT@@": "this"}
+            ,{"@@EXPORTS@@": "exports"}
+            ,{"@@MODULE_NAME@@": "ModelView"}
+            ,{"@@VERSION@@": "0.51"}
+        ]},
+        
+        {"process-shell":[
+             "echo ^/^*^*[DOC_MARKDOWN] >> ${IN}"
+            ,"echo documentation >> ${IN}"
+            ,"echo [/DOC_MARKDOWN]^*^*^/ >> ${IN}"
+            ,"type ${IN} > ${OUT}"
+        ]},
+        
+        {"doc":{
+             "startdoc": "/**[DOC_MARKDOWN]"
+            ,"enddoc": "[/DOC_MARKDOWN]**/"
+            ,"trimx": "\\s*\\*[ ]?"
+            ,"output": "./test-doc.md"
+        }},
+        
+        {"process-shell":[
+             "echo ^/^/ postprocessed >> ${IN}"
+            ,"echo ^/^/ postprocessed2 >> ${IN}"
+            ,"type ${IN} > ${OUT}"
+        ]},
+        
+        {"out": "./build/modelview.js"}
+    ]},
+    
+    {"minify":[
+        
+        {"src":[
+            "./build/modelview.js"
+        ]},
+        
+        {"minify":{
+             "uglifyjs":[
+                "-m -c"
+            ]
+            ,"closure":[
+                "--language_in=ECMASCRIPT5_STRICT"
+            ]
+            ,"yui":[
+                "--preserve-semi"
+            ]
+        }},
+        
+        {"process-shell":[
+             "echo ^/^/ postprocessed >> ${IN}"
+            ,"echo ^/^/ postprocessed2 >> ${IN}"
+            ,"type ${IN} > ${OUT}"
+        ]},
+        
+        {"out": "./build/modelview.min.js"}
+    ]}
+]
 }

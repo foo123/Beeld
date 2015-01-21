@@ -12,7 +12,7 @@ import json
 class Json_Parser():
     """Json parser for Python"""
     
-    def parse(s):
+    def parse( s ):
         return json.loads( s )
         
 

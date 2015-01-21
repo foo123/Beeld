@@ -1,13 +1,19 @@
 @echo off
 
-REM to use the python build tool do (the config file is passed as argument):
-REM ugliifyjs is default compiler if no compiler specified and minify directive is ON
-REM python Beeld.py --config "config.custom" --compiler uglifyjs
-REM if packaging css files
-REM python Beeld.py --config "%1" --compiler cssmin
+rem ###################################################
+rem #
+rem #   The buildtools repository is at:
+rem #   https://github.com/foo123/Beeld
+rem #
+rem ###################################################
 
-REM to use the php build tool do (the config file is passed as argument):
-REM php -f Beeld.php -- --config="config.custom" --compiler=closure
+rem ugliifyjs is default compiler if no compiler specified and minify directive is ON
 
-REM to use the node build tool do (the config file is passed as argument):
-node Beeld.js --config "config.custom" --compiler yui
+rem to use the python build tool do:
+rem python Beeld.py --config "sample-config.json" --compiler yui
+
+rem to use the php build tool do:
+rem php -f Beeld.php -- --config="sample-config.yml" --compiler=closure
+
+rem to use the node build tool do:
+node Beeld.js --config "sample-config.custom" --compiler unglifyjs

@@ -1,75 +1,93 @@
+###################################################
+#
+#   The buildtools repository is at:
+#   https://github.com/foo123/Beeld
+#
+###################################################
+
 ##
 ##  relative paths are relative to this current configuration file
 ##
 
-"tasks":
-    - "task1" :
-        # bundle any external dependencies in the built package
-        "bundle" :
-            - "./deps/dependency1.js"
-            - "./deps/dependency2.js"
+##
+## load and use any extra plugins
+##
+"plugins":  #(ordered map)
+    # include 'doc' plugin from plugins folder
+    - "doc": "!plg:doc"
 
 
-        # The input files
-        "src" :
+##
+## define 2 tasks to execute in order
+##
+"tasks":  #(ordered map)
+    # TASK 1 "build": makes the .js file
+    - "build":  #(ordered map)
+        - "src":  #(list)
             # include a umd-header template
-            - "!tpl:umd-header.tpl.js"
-            - "../src/file1.js"
-            - "../src/file2.js"
+            - "!tpl:umd-header-single.tpl.js"
+            ### modelview.js, main framework ###
+            - "./src/header.js"
+            - "./src/utils.js"
+            - "./src/event.js"
+            - "./src/pb.js"
+            - "./src/cache.js"
+            - "./src/types.js"
+            - "./src/model.js"
+            - "./src/view.js"
+            - "./src/footer.js"
+            ### jquery.modelview.js, jQuery/jQueryUI plugin/widget (optional) ###
+            - "./src/jquery.modelview.js"
             # include a umd-footer template
             - "!tpl:umd-footer.tpl.js"
-
-             
-        # The file to extract the header (else first file in SRC list is used)
-        "header" : "../src/file1.js"
-
-
-        # Any texts to be replaced in the final file
-        "replace" :
-            - "a" : "b"
-            - "c" : "d"
-
-            
-        # allow some pre-process to take place
-        "preprocess": []
-
-
-        # Extract documentation from the source
-        "doc" :
-            # start of documentation block
-            "startdoc" : "/**[DOC_MARKUP]"
-            # end of documentation block
-            "enddoc" : "[/DOC_MARKUP]**/"
-            # remove this string from the the start of each doc block line
-            "trim" : "* "
-            # or use a regular expression to trim the start part of each line
-            "trimx" : "\\s*\\*"
-            # separator between each doc block in the output file (default is 2 lines)
-            "separator" : "\n\n=====================================================\n\n"
-            # documentation output file
-            "output" : "../doc/manual.md"
-
-            
+        # extract header from this file
+        #(key-value)
+        - "header": "./src/header.js"
+        # do text replacements
+        - "replace":  #(ordered map)
+            - "@@ROOT@@": "this"
+            - "@@EXPORTS@@": "exports"
+            - "@@MODULE_NAME@@": "ModelView"
+            - "@@VERSION@@": "0.51"
+        # allow some pre-process to take place (shell scripting)
+        - "process-shell":  #(list)
+            - "echo ^/^*^*[DOC_MARKDOWN] >> ${IN}"
+            - "echo documentation >> ${IN}"
+            - "echo [/DOC_MARKDOWN]^*^*^/ >> ${IN}"
+            - "type ${IN} > ${OUT}"
+        # doc plugin: extract documentation from the source
+        - "doc":  #(map)
+            "startdoc": "/**[DOC_MARKDOWN]"
+            "enddoc": "[/DOC_MARKDOWN]**/"
+            "trimx": "\\s*\\*[ ]?"
+            "output": "./test-doc.md"
+        # allow some post-process to take place (shell scripting)
+        - "process-shell":  #(list)
+            - "echo ^/^/ postprocessed >> ${IN}"
+            - "echo ^/^/ postprocessed2 >> ${IN}"
+            - "type ${IN} > ${OUT}"
+        #(key-value)
+        - "out": "./build/modelview.js"  
+    # TASK 2 "minify": makes the .min.js file
+    - "minify":  #(ordered map)
+        - "src":  #(list)
+            - "./build/modelview.js"
         # Minify the Package
-        "minify" :
+        - "minify":  #(map)
             # Options for Node UglifyJS Compiler (if used, default), (mangle and compress)
-            "uglifyjs" : 
+            "uglifyjs":  #(list)
                 - "-m -c"
             # Options for Java Closure Compiler (if used)
-            "closure" : 
+            "closure":  #(list)
                 - "--language_in=ECMASCRIPT5_STRICT"
             # Options for Java YUI Compressor Compiler (if used)
-            "yui" : 
+            "yui":  #(list)
                 - "--preserve-semi"
-            # Options for CSS Minifier, if the files are .css
-            "cssmin" :
-                - "--embed-images"
-                #- "--embed-fonts"
+        # allow some post-process to take place (shell scripting)
+        - "process-shell":  #(list)
+            - "echo ^/^/ postprocessed >> ${IN}"
+            - "echo ^/^/ postprocessed2 >> ${IN}"
+            - "type ${IN} > ${OUT}"
+        #(key-value)
+        - "out": "./build/modelview.min.js"
 
-                
-        # allow some post-process to take place
-        "postprocess": []
-
-
-        # The final output file
-        "out" : "../build/package_output.min.js"

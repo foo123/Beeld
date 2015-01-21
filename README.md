@@ -1,9 +1,9 @@
 Beeld
 =====
 
-**A scriptable and configurable source code builder framework and tool in Node/Python/PHP**
+**A scriptable, extendable and configurable source code builder framework and tool in Node/Python/PHP**
 
-**version 0.6**
+**version 0.7**
 
 
 This is a new framework and tool for building projects from sources, which is based on (and extends) the [previous buildtools used here](https://github.com/foo123/scripts)
@@ -15,10 +15,17 @@ This is a new framework and tool for building projects from sources, which is ba
 * Configuration file can be in custom format (default), JSON format (.json) or YAML format (.yaml, .yml) <del>or INI format (.ini)</del>
 * Run the .bat or .sh scripts to build the package
 
-###How to Use
-
 Each tool/compiler, if run with no parameters in the command-line, will print a help screen explaining usage options.
 Also the sample-config files and build.bat, build.sh files, demonstrate how the build tools are used
+
+
+###Plugins, Extensions, Scripting
+
+The framework can be extended by plugins. The plugin code can be in the Beeld/plugins folder or even in current working directory. Each plugin can define a new action to be used on the source data through a pipeline.
+
+The plugin and the new action are both defined in each config file (see sample config files).
+
+Furthermore the framework has a built-in "replace" action to replace text in sources and a "process-shell" action which allows to manipulate the source data through direct shell scripting (for example for some fast shell text manipulation)
 
 
 ###UMD Templates

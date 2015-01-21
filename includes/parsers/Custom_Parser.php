@@ -168,7 +168,7 @@ class Custom_Parser
                         }
                         else
                         {
-                            $val = self::removeComment($val, '#', $comm_index);
+                            $val = self::removeComment($val, '#');
                         }
                     }
                 }

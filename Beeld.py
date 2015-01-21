@@ -5,7 +5,7 @@
 #   https://github.com/foo123/Beeld
 #
 #   A scriptable and configurable source code builder framework in Node/PHP/Python
-#   @version: 0.6
+#   @version: 0.7
 #
 ##
 
@@ -18,51 +18,17 @@ except ImportError:
     import optparse
     ap = 0
 
-from includes.PublishSubscribe import PublishSubscribe
-
 BEELD_ROOT = os.path.dirname(os.path.abspath(__file__))
 BEELD_INCLUDES = os.path.join(BEELD_ROOT, 'includes') + '/'
+BEELD_PARSERS = os.path.join(BEELD_INCLUDES, 'parsers') + '/'
 BEELD_COMPILERS = os.path.join(BEELD_ROOT, 'compilers') + '/'
 BEELD_TEMPLATES = os.path.join(BEELD_ROOT, 'templates') + '/'
-BEELD_PARSERS = os.path.join(BEELD_ROOT, 'parsers') + '/'
+BEELD_PLUGINS = os.path.join(BEELD_ROOT, 'plugins') + '/'
 
+from includes.PublishSubscribe import PublishSubscribe
 
-#List = list
-#Map = dict
-class OrderedMap:
-    
-    def __init__(self, om=None):
-        self.om = om
-        self.index = 0
-    
-    def hasNext(self):
-        return (self.index < len(self.om))
-    
-    def getNext(self):
-        if self.index < len(self.om):
-        
-            obj = self.om[self.index]
-            key = list(obj.keys())[0]
-            self.index += 1
-            return {'key': key, 'val': obj[key]}
-        
-        return None
-    
-    def getItem(self,index):
-        if index >= 0 and index < len(self.om):
-        
-            obj = self.om[index]
-            key = list(obj.keys())[0]
-            return {'key': key, 'val': obj[key]}
-        
-        return None
-    
-    def rewind(self):
-        self.index = 0
-        return self
-    
-
-
+#
+# beeld utils
 def read(file, enc=None):
     buffer = ''
     if enc: f = open(file, "r", -1, enc)
@@ -77,7 +43,7 @@ def write(file, text, enc=None):
     f.write(text)
     f.close()
     
-def joinPath(*args): 
+def join_path(*args): 
     argslen = len(args)
     DS = os.sep
     
@@ -121,7 +87,7 @@ def joinPath(*args):
         return path
 
 # http://www.php2python.com/wiki/function.pathinfo/
-def fileExt(fileName):
+def file_ext(fileName):
     extension  = os.path.splitext(fileName)[-1]
     if extension is not None:
         return extension
@@ -154,14 +120,14 @@ def cleanup(files):
                 pass
         
 
-def getRealPath(file, basePath=''):
+def get_real_path(file, basePath=''):
     if ''!=basePath and (file.startswith('./') or file.startswith('../') or file.startswith('.\\') or file.startswith('..\\')): 
-        return joinPath(basePath, file)
+        return join_path(basePath, file)
     else:
         return file
 
 TPLS = {}
-def getTpl(id, enc=None):
+def get_tpl(id, enc=None):
     global TPLS
     tpl_id = 'tpl_' + id
     if tpl_id not in TPLS:
@@ -213,224 +179,285 @@ def parseOptions( defaults ):
     return options
 
 
-def run_process_loop( evt, p, process_list ):
-    p.process_list = process_list
-    p.process_list_count = len(p.process_list)
-    p.process_list_index = 0
-    write( p.in_tuple, p.srcText, p.encoding )
-    def process_loop( ):
-        if p.process_list_index < p.process_list_count:
-            cmd = multi_replace(p.process_list[p.process_list_index], [
-             ['${DIR}',          p.basePath]
-            ,['${CWD}',          p.cwd]
-            ,['${COMPILERS}',    BEELD_COMPILERS]
-            ,['${TPLS}',         BEELD_TEMPLATES]
-            ,['${IN}',           p.in_tuple]
-            ,['${OUT}',          p.out_tuple]
-            ])
 
-            p.process_list_index += 1
-            err = os.system(cmd)
-            # on *nix systems this is a tuple, similar to the os.wait return result
-            # on windows it is an integer
-            # http://docs.python.org/2/library/os.html#process-management
-            # http://docs.python.org/2/library/os.html#os.wait
-            # high-byte is the exit status
-            if not (type(err) is int): err = 255 & (err[1]>>8)
-            # some error occured
-            if 0!=err: 
-                p.err = 'Error executing "'+cmd+'"'
-                evt.abort()
-                return
-            else: process_loop( )
-        else:
-            p.srcText = read(p.out_tuple, p.encoding)
-            evt.next( )
-    process_loop( )
-
-def create_abort_process( ):
-    def abort_process( evt=None ):
-        if evt:
-            params = evt.data.data
-            cleanup([params.in_tuple, params.out_tuple])
-            if params.err: print( params.err )
-            evt.dispose( )
-        sys.exit(1)
-    return abort_process
+#List = list
+#Map = dict
+class OrderedMap:
     
-def create_tasks( config, tasks, default_actions, actions ):
-    def log_settings( evt ):
-        params = evt.data.data
-        sepLine = "=" * 65
-        # output the build settings
-        if not params.outputToStdOut:
-            print (sepLine)
-            print (" Build Package ")
-            print (sepLine)
-            print (" ")
-            print ("Input    : " + params.inputType);
-            print ("Encoding : " + params.encoding)
-            print ("Task     : " + params.currentTask)
-            if params.doMinify:
-                print ("Minify   : ON")
-                print ("Compiler : " + params.compilers[params.selectedCompiler]['name'])
-            else:
-                print ("Minify   : OFF")
-            print ("Output   : " + params.outFile)
-            print (" ")
-        evt.next( )
+    def __init__(self, om=None):
+        self.om = om
+        self.index = 0
     
-    def finish_process( evt ):
-        params = evt.data.data
-        cleanup([params.in_tuple, params.out_tuple])
-        evt.dispose( )
+    def hasNext(self):
+        return (self.index < len(self.om))
+    
+    def getNext(self, raw=False):
+        if self.index < len(self.om):
+        
+            if True == raw:
+                obj = self.om[self.index]
+                self.index += 1
+                return obj
+            else:    
+                obj = self.om[self.index]
+                key = list(obj.keys())[0]
+                self.index += 1
+                return [key, obj[key]]
+        
         return None
     
-    non_local = PublishSubscribe.Data({'tasks': tasks, 'i': 0, 'l': len(tasks)})
-    def switch_task( evt ):
-        if non_local.i < non_local.l:
+    def hasItem(self,index):
+        return (index >= 0 and index < len(self.om))
+    
+    def hasItemByKey(self,key):
+        om = self.om
+        for i in range(len(om)-1):
+            entry = om[i]
+            if key in entry:
+                return i
+        return -1
+    
+    def getItem(self,index):
+        if index >= 0 and index < len(self.om):
         
-            task = non_local.tasks[non_local.i][0]
-            config_new = non_local.tasks[non_local.i][1]
-            non_local.i += 1
-            params = evt.data.data
-            pipeline = params.pipeline
-            params.config = config_new
-            params.currentTask = task
-            params.bundleText = None 
-            params.headerText = None 
-            params.srcText = None
-            params.err = False
-            if 'out' in  config_new:
-            
-                params.outFile = getRealPath(config_new['out'], params.basePath)
-                params.outputToStdOut = False
-            
-            else:
-            
-                params.outFile = None
-                params.outputToStdOut = True
-            
-            if 'minify' in config_new:
-            
-                params.doMinify = True
-            
-            else:
-            
-                params.doMinify = False
-            
-            pipeline.on('#actions', log_settings)
-            for action in default_actions:
-            
-                action = 'action_' + action
-                if action in actions: pipeline.on('#actions', actions[ action ])
-            
-            if non_local.i < non_local.l: pipeline.on('#actions', switch_task)
-            else: pipeline.on('#actions', finish_process)
-            evt.next( )
+            obj = self.om[index]
+            key = list(obj.keys())[0]
+            return [key, obj[key]]
         
-        else:
-            finish_process( evt )
-            
-    return switch_task,finish_process,log_settings
+        return None
+    
+    def getItemByKey(self,key):
+        om = self.om
+        for entry in om:
+            if key in entry:
+                return [key, entry[key]]
+        return None
+    
+    def rewind(self):
+        self.index = 0
+        return self
+    
 
+class BeeldParser:
 
-#
-# Beeld default parsers
-class BeeldParsers:
+    def __init__(self, path, class_name, name):
+        self.path = path
+        self.class_name = class_name
+        self.name = name
+        self.parser = None
+
     
-    Path = BEELD_PARSERS
-    JSON = None
-    YAML = None
-    CUSTOM = None
+    def dispose(self):
+        self.class_name = None
+        self.name = None
+        self.path = None
+        self.parser = None
+        return self
     
-    def init():
-        parsers = BeeldParsers
-        
-        def JSON_load():
-            return import_path(BeeldParsers.JSON.path).Json_Parser
-        
-        def JSON_parse( text ):
-            if not BeeldParsers.JSON.parser:
-                BeeldParsers.JSON.parser = BeeldParsers.JSON.load( )
-            return BeeldParsers.JSON.parser.parse( text )
-        
-        def YAML_load():
-            return import_path(BeeldParsers.YAML.path).Yaml_Parser
-        
-        def YAML_parse( text ):
-            if not BeeldParsers.YAML.parser:
-                BeeldParsers.YAML.parser = BeeldParsers.YAML.load( )
-            return BeeldParsers.YAML.parser.parse( text )
-        
-        def CUSTOM_load():
-            return import_path(BeeldParsers.CUSTOM.path).Custom_Parser
-        
-        def CUSTOM_parse( text ):
-            if not BeeldParsers.CUSTOM.parser:
-                BeeldParsers.CUSTOM.parser = BeeldParsers.CUSTOM.load( )
-            return BeeldParsers.CUSTOM.parser.parse( text )
-        
-        parsers.JSON = PublishSubscribe.Data({
-        'name': 'JSON Parser',
-        'format': 'JSON Format',
-        'ext': ".json",
-        'path': parsers.Path + 'json.py',
-        'parser': None,
-        'load': JSON_load,
-        'parse': JSON_parse
-        })
-        
-        parsers.YAML = PublishSubscribe.Data({
-        'name': 'PyYaml Parser',
-        'format': 'Yaml Format',
-        'ext': ".yml/.yaml",
-        'path': parsers.Path + 'yaml.py',
-        'parser': None,
-        'load': YAML_load,
-        'parse': YAML_parse
-        })
-        
-        parsers.CUSTOM = PublishSubscribe.Data({
-        'name': 'Custom Parser',
-        'format': 'Custom Format',
-        'ext': ".custom/*",
-        'path': parsers.Path + 'custom.py',
-        'parser': None,
-        'load': CUSTOM_load,
-        'parse': CUSTOM_parse
-        })
+    def load(self):
+        #module = import_path(self.path)
+        #for i in dir(module): print(i)
+        #sys.exit(0)
+        return getattr(import_path(self.path), self.class_name)
     
-BeeldParsers.init()
+    def parse(self, text):
+        if not self.parser:
+            self.parser = self.load( )
+        return self.parser.parse( text )
+    
+
+class BeeldCompiler:
+    
+    def __init__(self, name, cmd, options=''):
+        #self.name = None
+        #self.cmd_tpl = None
+        #self.options = None
+        self.name = name
+        self.cmd_tpl = cmd
+        self.options = options
+    
+    def dispose(self):
+        self.name = None
+        self.cmd_tpl = None
+        self.options = None
+        return self
+    
+    
+    def compiler(self,args=list()):
+        return multi_replace(self.cmd_tpl, args)
+    
+    
+    def option(self,opt):
+        opt = str(opt)
+        p = " " if (len(self.options) and len(opt)) else ""
+        self.options += p + opt
+        return self
+    
 
 #
 # Beeld default actions
 class BeeldActions:
-    def action_initially(evt):
-        evt.next()
+    
+    def abort(evt, params=None):
+        if evt and None==params: params = evt.data.data
+        config = params.config
+        options = params.options
+        data = params.data
+        current = params.current
+        cleanup([data.tmp_in, data.tmp_out])
+        if data.err: print( data.err )
+        options.dispose()
+        data.dispose()
+        current.dispose()
+        params.compilers = None
+        params.config = None
+        params.options = None
+        params.data = None
+        params.current = None
+        if evt: evt.dispose()
+        sys.exit(1)
+        
+    def log(evt):
+        params = evt.data.data
+        options = params.options
+        data = params.data
+        current = params.current
+        sepLine = "=" * 65
+        # output the build settings
+        if not options.outputToStdOut:
+            print (sepLine)
+            print (" Build Package ")
+            print (sepLine)
+            print (" ")
+            print ("Input    : " + options.inputType);
+            print ("Encoding : " + options.encoding)
+            print ("Task     : " + current.task)
+            if options.minify:
+                print ("Minify   : ON")
+                print ("Compiler : " + params.compilers[options.compiler].name)
+            else:
+                print ("Minify   : OFF")
+            print ("Output   : " + options.out)
+            print (" ")
+        evt.next( )
+
+    def finish(evt):
+        params = evt.data.data
+        #config = params.config
+        options = params.options
+        data = params.data
+        current = params.current
+        cleanup([data.tmp_in, data.tmp_out])
+        options.dispose()
+        data.dispose()
+        current.dispose()
+        params.compilers = None
+        params.config = None
+        params.options = None
+        params.data = None
+        params.current = None
+        evt.dispose()
+
+    def next_action(evt):
+        params = evt.data.data
+        current = params.current
+        task_actions = current.task_actions
+        if task_actions and task_actions.hasNext():
+            a = task_actions.getNext() 
+            action = 'action_' + a[0]
+            if action in current.actions:
+                current.action = a[0]
+                current.action_cfg = a[1]
+                current.actions[ action ]( evt )
+            
+            else:
+                evt.next()
+                    
+        else:
+            evt.next();
+        
+            
+    def next_task(evt):
+        params = evt.data.data
+        options = params.options
+        data = params.data
+        current = params.current
+        current_tasks = current.tasks
+        pipeline = params.pipeline
+        
+        if current_tasks and current_tasks.hasNext():
+            task = current_tasks.getNext()
+            
+            current.task = task[0]
+            current.task_actions = Beeld.OrderedMap(task[1])
+            current.action = ''
+            current.action_cfg = None
+            
+            data.bundle = ''
+            data.header = ''
+            data.src = ''
+            data.err = False
+            
+            out = current.task_actions.getItemByKey('out')
+            if out:
+            
+                options.out = get_real_path(out[1], options.basePath)
+                options.outputToStdOut = False
+            
+            else:
+            
+                options.out = None
+                options.outputToStdOut = True
+            
+            if -1 < current.task_actions.hasItemByKey('minify'):
+                options.minify = True
+            else:
+                options.minify = False
+            
+            # default header action
+            # is first file of src if exists
+            src_action = current.task_actions.hasItemByKey('src')
+            if (not current.task_actions.getItemByKey('header')) and (-1 < src_action):
+                src_cfg = current.task_actions.getItemByKey('src')
+                current.task_actions.om.insert(src_action+1,{'header':src_cfg[1][0]})
+            
+            pipeline.on('#actions', Beeld.Actions.log)
+            
+            while current.task_actions.hasNext():
+                current.task_actions.getNext()
+                pipeline.on('#actions', Beeld.Actions.next_action)
+            current.task_actions.rewind( )
+            
+            if current_tasks.hasNext():
+                pipeline.on('#actions', Beeld.Actions.next_task)
+            else: 
+                pipeline.on('#actions', Beeld.Actions.finish)
+            
+            evt.next( )
+        else:
+            Beeld.Actions.finish( evt )
+                
+    #def action_initially(evt):
+    #    evt.next()
 
     def action_src(evt):
         params = evt.data.data
-        config = params.config
-        params.srcText = ''
-        params.headerText = None
+        options = params.options
+        data = params.data
+        current = params.current
         
-        if 'src' in config:
-            srcFiles = config['src']
+        data.src = ''
+        
+        if current.action_cfg:
+            srcFiles = current.action_cfg
             # convert to list/array if not so
             if not isinstance(srcFiles, list): srcFiles = [srcFiles]
         else: 
             srcFiles = None
         
-        if 'header' in config:
-            headerFile = config['header']
-        else: 
-            headerFile = None
-            
         if srcFiles and len(srcFiles)>0:
             tplid = '!tpl:'
             tplidlen = len(tplid)
-            doneheader = False
             buffer = []
 
             for filename in srcFiles:
@@ -438,165 +465,161 @@ class BeeldActions:
                 
                 if filename.startswith(tplid):
                     # template file
-                    buffer.append( getTpl( filename[tplidlen:], params.encoding ) )
+                    buffer.append( get_tpl( filename[tplidlen:], options.encoding ) )
                 else:
                     # src file
-                    buffer.append( read( getRealPath( filename, params.basePath ), params.encoding ) )
-
-                if not doneheader:
-                    if headerFile and filename == headerFile:
-                        params.headerText = buffer[len(buffer)-1]
-                        doneheader = True
-                    elif not headerFile:
-                        params.headerText = buffer[len(buffer)-1]
-                        doneheader = True
-                
-            # header file is NOT one of the source files
-            if headerFile and None == params.headerText:
-                params.headerText = read( getRealPath( headerFile, params.basePath ) )
-            params.srcText = "".join(buffer)
+                    buffer.append( read( get_real_path( filename, options.basePath ), options.encoding ) )
+            data.src = "".join(buffer)
         
         evt.next()
 
     def action_header(evt):
         params = evt.data.data
-        headerText = params.headerText
-        params.headerText = ''
-        if headerText:
+        options = params.options
+        data = params.data
+        current = params.current
+        
+        headerFile = current.action_cfg
+        headerText = None
+        data.header = ''
+        
+        if headerFile:
+            headerText = read( get_real_path( headerFile, options.basePath ), options.encoding )
+            
+        if headerText and len(headerText):
             if headerText.startswith('/**'):
                 position = headerText.find("**/", 0)
-                params.headerText = headerText[0:position+3]
+                data.header = headerText[0:position+3]
             elif headerText.startswith('/*!'):
                 position = headerText.find("!*/", 0)
-                params.headerText = headerText[0:position+3]
+                data.header = headerText[0:position+3]
         
         evt.next()
 
     def action_replace(evt):
         params = evt.data.data
-        config = params.config
-        if 'replace' in config and config['replace']:
+        options = params.options
+        data = params.data
+        current = params.current
+        if current.action_cfg:
             
-            replace = Beeld.OrderedMap(config['replace'])
-            if params.headerText and len(params.headerText)>0:
+            reple = Beeld.OrderedMap(current.action_cfg)
+            if data.header and len(data.header)>0:
                 hasHeader = True
             else:
                 hasHeader = False
                 
             # ordered map
-            while replace.hasNext():
-                rep = replace.getNext()
-                params.srcText = params.srcText.replace(rep['key'], rep['val'])
+            while reple.hasNext():
+                rep = reple.getNext()
+                data.src = data.src.replace(rep[0], rep[1])
                 if hasHeader:
-                    params.headerText = params.headerText.replace(rep['key'], rep['val'])
+                    data.header = data.header.replace(rep[0], rep[1])
         
         evt.next()
         
-    def action_preprocess(evt):
+    def action_shellprocess(evt):
         params = evt.data.data
-        config = params.config
-        if "preprocess" in config and config['preprocess']:
-            run_process_loop(evt, params, list(config['preprocess']))
+        options = params.options
+        data = params.data
+        current = params.current
+        process_list = current.action_cfg
+        
+        if process_list and len(process_list):
+            
+            params.process_list = process_list
+            params.process_list_index = 0
+            params.process_list_count = len(params.process_list)
+            write( data.tmp_in, data.src, options.encoding )
+            
+            def process_loop(evt):
+                params = evt.data.data
+                options = params.options
+                data = params.data
+                current = params.current
+                if params.process_list_index < params.process_list_count:
+                    cmd = multi_replace(params.process_list[params.process_list_index], [
+                     ['${DIR}',          options.basePath]
+                    ,['${CWD}',          options.cwd]
+                    ,['${COMPILERS}',    BEELD_COMPILERS]
+                    ,['${TPLS}',         BEELD_TEMPLATES]
+                    ,['${IN}',           data.tmp_in]
+                    ,['${OUT}',          data.tmp_out]
+                    ])
+
+                    params.process_list_index += 1
+                    err = os.system(cmd)
+                    # on *nix systems this is a tuple, similar to the os.wait return result
+                    # on windows it is an integer
+                    # http://docs.python.org/2/library/os.html#process-management
+                    # http://docs.python.org/2/library/os.html#os.wait
+                    # high-byte is the exit status
+                    if not (type(err) is int): err = 255 & (err[1]>>8)
+                    # some error occured
+                    if 0!=err: 
+                        data.err = 'Error executing "'+cmd+'"'
+                        params.process_list = None
+                        evt.abort()
+                        return
+                    else: process_loop(evt)
+                else:
+                    data.src = read(data.tmp_out, options.encoding)
+                    params.process_list = None
+                    evt.next( )
+            
+            process_loop(evt)
+        
         else:
             evt.next( )
         
-    def action_doc(evt):
-        params = evt.data.data
-        config = params.config
-        if ('doc' in config) and config['doc'] and ('output' in config['doc']):
-            
-            doc = config['doc']
-            docFile = getRealPath(doc['output'], params.basePath)
-            startDoc = doc['startdoc']
-            endDoc = doc['enddoc']
-            
-            _trim = None
-            _trimlen = 0
-            isRegex = 0
-            
-            sep = doc['separator'] if 'separator' in doc else "\n\n"
-                
-            if 'trimx' in doc: 
-                isRegex = 1
-                _trim = re.compile('^' + doc['trimx'])
-            elif 'trim' in doc: 
-                isRegex = 0
-                _trim = doc['trim']
-                _trimlen = len(_trim)
-                
-            
-            docs = []
-            
-            # extract doc blocks
-            blocks = params.srcText.split( startDoc )
-            for b in blocks:
-                tmp = b.split( endDoc )
-                if len(tmp)>1: docs.append( tmp[0] )
-            blocks = None
-            
-            # trim start of each doc block line
-            if _trim:
-                for i in range(len(docs)-1):
-                    tmp = docs[i].split( "\n" )
-                    
-                    for j in range(len(tmp)-1):
-                        if len(tmp[j])>0:
-                            if isRegex:
-                                tmp[j] = re.sub(_trim, '', tmp[j])
-                            elif tmp[j].startswith(_trim):
-                                tmp[j] = tmp[j][_trimlen:]
-                    
-                    docs[i] = "\n".join( tmp )
-            write(docFile, sep.join( docs ), params.encoding)
-        
-        evt.next()
-
     def action_minify(evt):
         params = evt.data.data
-        config = params.config
-        if 'minify' in config and '' != params.srcText:
-            minsets = config['minify']
+        options = params.options
+        data = params.data
+        current = params.current
+        minify = current.action_cfg
+        if minify and '' != data.src:
             
-            if 'uglifyjs' in minsets:
-                opts = minsets['uglifyjs']
+            if 'uglifyjs' in minify:
+                opts = minify['uglifyjs']
                 # convert to list/array if not so
                 if not isinstance(opts, list): opts = [opts]
-                params.compilers['uglifyjs']['options'] = " ".join(opts)
+                params.compilers['uglifyjs'].option(" ".join(opts))
                 
-            if 'closure' in minsets:
-                opts = minsets['closure']
+            if 'closure' in minify:
+                opts = minify['closure']
                 # convert to list/array if not so
                 if not isinstance(opts, list): opts = [opts]
-                params.compilers['closure']['options'] = " ".join(opts)
+                params.compilers['closure'].option(" ".join(opts))
                 
-            if 'yui' in minsets:
-                opts = minsets['yui']
+            if 'yui' in minify:
+                opts = minify['yui']
                 # convert to list/array if not so
                 if not isinstance(opts, list): opts = [opts]
-                params.compilers['yui']['options'] = " ".join(opts)
+                params.compilers['yui'].option(" ".join(opts))
             
-            if 'cssmin' in minsets:
-                opts = minsets['cssmin']
+            if 'cssmin' in minify:
+                opts = minify['cssmin']
                 # convert to list/array if not so
                 if not isinstance(opts, list): opts = [opts]
-                params.compilers['cssmin']['options'] = " ".join(opts)
+                params.compilers['cssmin'].option(" ".join(opts))
             
-            write(params.in_tuple, params.srcText, params.encoding)
+            write(data.tmp_in, data.src, options.encoding)
 
             extra = ''
             # use the selected compiler
-            compiler = params.compilers[params.selectedCompiler]
-            if 'cssmin'==params.selectedCompiler and "--basepath " not in compiler['options']:
-                extra = "--basepath "+params.basePath
-            elif 'yui'==params.selectedCompiler or 'closure'==params.selectedCompiler:
-                extra = "--charset "+params.encoding
+            compiler = params.compilers[options.compiler]
+            if 'cssmin'==options.compiler and "--basepath " not in compiler.options:
+                extra = "--basepath "+options.basePath
+            elif options.compiler in ['yui', 'closure']:
+                extra = "--charset "+options.encoding
                     
-            cmd = multi_replace(compiler['compiler'], [
+            cmd = compiler.compiler([
              ['${COMPILERS}',    BEELD_COMPILERS]
             ,['${EXTRA}',        extra]
-            ,['${OPTIONS}',      compiler['options']]
-            ,['${IN}',           params.in_tuple]
-            ,['${OUT}',          params.out_tuple]
+            ,['${OPTIONS}',      compiler.options]
+            ,['${IN}',           data.tmp_in]
+            ,['${OUT}',          data.tmp_out]
             ])
             err = os.system(cmd)
             # on *nix systems this is a tuple, similar to the os.wait return result
@@ -606,31 +629,26 @@ class BeeldActions:
             # high-byte is the exit status
             if not (type(err) is int): err = 255 & (err[1]>>8)
             
-            if 0==err: params.srcText = read(params.out_tuple, params.encoding)
+            if 0==err: data.src = read(data.tmp_out, options.encoding)
             
             # some error occured
             if 0!=err: 
-                params.err = 'Error executing "'+cmd+'"'
+                data.err = 'Error executing "'+cmd+'"'
                 evt.abort()
                 return
             
         evt.next()
 
-    def action_postprocess(evt):
-        params = evt.data.data
-        config = params.config
-        if "postprocess" in config and config['postprocess']:
-            run_process_loop(evt, params, list(config['postprocess']))
-        else:
-            evt.next( )
-
     def action_bundle(evt):
         params = evt.data.data
-        config = params.config
-        params.bundleText = ''
+        options = params.options
+        data = params.data
+        current = params.current
         
-        if 'bundle' in config:
-            bundleFiles = config['bundle']
+        data.bundle = ''
+        
+        if current.action_cfg:
+            bundleFiles = current.action_cfg
             # convert to list/array if not so
             if not isinstance(bundleFiles, list): bundleFiles = [bundleFiles]
         else: 
@@ -641,99 +659,127 @@ class BeeldActions:
 
             for filename in bundleFiles:
                 if not len(filename): continue
-                buffer.append( read( getRealPath( filename, params.basePath ), params.encoding ) )
+                buffer.append( read( get_real_path( filename, options.basePath ), options.encoding ) )
 
-            params.bundleText = "\n".join(buffer) + "\n"
+            data.bundle = "\n".join(buffer) + "\n"
         
         evt.next()
 
     def action_out(evt):
         params = evt.data.data
+        options = params.options
+        data = params.data
+        #current = params.current
         # write the processed file
-        text = params.bundleText+params.headerText+params.srcText
-        params.bundleText = None 
-        params.srcText = None 
-        params.headerText = None
-        if params.outputToStdOut: print (text)
-        else: write(params.outFile, text, params.encoding)
+        text = data.bundle+data.header+data.src
+        data.bundle = '' 
+        data.src = '' 
+        data.header = ''
+        if options.outputToStdOut: print (text)
+        else: write(options.out, text, options.encoding)
         evt.next( )
     
-    def action_finally(evt):
-        evt.next()
+    #def action_finally(evt):
+    #    evt.next()
 
+class BeeldUtils:
+    multi_replace = multi_replace
+    read = read
+    write = write
+    join_path = join_path
+    tmpfile = tmpfile
+    get_real_path = get_real_path
+
+#
+# Beeld default parsers
+BeeldParsers = {
+    '.json': BeeldParser(
+        BEELD_PARSERS + 'Json_Parser.py',
+        'Json_Parser',
+        'JSON Parser'
+    ),
+    '.yml': BeeldParser(
+        BEELD_PARSERS + 'Yaml_Parser.py',
+        'Yaml_Parser',
+        'PyYaml Parser'
+    ),
+
+    '.custom': BeeldParser(
+        BEELD_PARSERS + 'Custom_Parser.py',
+        'Custom_Parser',
+        'Custom Parser'
+    )
+}
+# aliases
+BeeldParsers['.yaml'] = BeeldParsers['.yml']
+BeeldParsers['*'] = BeeldParsers['.custom']
 
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
     
-    VERSION = "0.6"
+    VERSION = "0.7"
     
+    def OrderedMap(om):
+        return OrderedMap(om)
+        
+    def Parser(path, class_name, name):
+        return BeeldParser(path, class_name, name)
+        
+    def Compiler(name, cmd, options=''):
+        return BeeldCompiler(name, cmd, options)
+        
+    def Obj(props=None):
+        return PublishSubscribe.Data(props)
+        
     Parsers = BeeldParsers
     Actions = BeeldActions
-    OrderedMap = OrderedMap
+    Utils = BeeldUtils
     
     def __init__(self):
         
         self.initPubSub( )
         
         self.actions = {
-         'action_initially': Beeld.Actions.action_initially
-        ,'action_src': Beeld.Actions.action_src
+         'action_src': Beeld.Actions.action_src
         ,'action_header': Beeld.Actions.action_header
         ,'action_replace': Beeld.Actions.action_replace
-        ,'action_preprocess': Beeld.Actions.action_preprocess
-        ,'action_doc': Beeld.Actions.action_doc
+        ,'action_process-shell': Beeld.Actions.action_shellprocess
         ,'action_minify': Beeld.Actions.action_minify
-        ,'action_postprocess': Beeld.Actions.action_postprocess
         ,'action_bundle': Beeld.Actions.action_bundle
         ,'action_out': Beeld.Actions.action_out
-        ,'action_finally': Beeld.Actions.action_finally
         }
         
-        self.tasks = [ ]
-        
-        self.compilers = {
-        'cssmin' : {
-            'name' : 'CSS Minifier',
-            'compiler' : 'python ${COMPILERS}cssmin.py ${EXTRA} ${OPTIONS} --input ${IN}  --output ${OUT}',
-            'options' : ''
-        },
-        'uglifyjs' : {
-            'name' : 'Node UglifyJS Compiler',
-            'compiler' : 'uglifyjs ${IN} ${OPTIONS} -o ${OUT}',
-            'options' : ''
-        },
-        'closure' : {
-            'name' : 'Java Closure Compiler',
-            'compiler' : 'java -jar ${COMPILERS}closure.jar ${EXTRA} ${OPTIONS} --js ${IN} --js_output_file ${OUT}',
-            'options' : ''
-        },
-        'yui' : {
-            'name' : 'Java YUI Compressor Compiler',
-            'compiler' : 'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}',
-            'options' : ''
-        }
-        }
-        
-    def dispose( self ):
+    def dispose(self):
         self.disposePubSub( )
-        self.compilers = None
         self.actions = None
-        self.tasks = None
         return self
         
-    def addAction( self, action, handler ):
+    def addAction(self, action, handler):
         if action and callable(handler):
             self.actions['action_'+action] = handler
         return self
     
-    def addTask( self, task, actions ):
-        if task and actions:
-            self.tasks.append([task, actions])
-        return self
+    def loadPlugins(self, plugins, basePath):
+        if plugins and len(plugins):
+            plugins = Beeld.OrderedMap(plugins)
+            plgid = '!plg:'
+            plgidlen = len(plgid)
+            while plugins.hasNext():
+                plg = plugins.getNext()
+                filename = plg[1] + '.py'
+                if filename.startswith(plgid):
+                    filename  = BEELD_PLUGINS + filename[plgidlen:]
+                else:
+                    filename = get_real_path( filename, basePath )
+                loader = getattr(import_path(filename), plg[0])
+                loader( self, Beeld )
         
+        return self
+    
+    # parse input arguments, options and configuration settings
     def parse(self):
         
-        params = PublishSubscribe.Data()
+        params = Beeld.Obj()
         
         options = parseOptions({
             'help' : False,
@@ -743,98 +789,100 @@ class Beeld(PublishSubscribe):
             'enc' : 'utf-8'
         })
         
+        params.compilers = {
+        'cssmin': Beeld.Compiler(
+            'CSS Minifier',
+            'python ${COMPILERS}cssmin.py ${EXTRA} ${OPTIONS} --input ${IN}  --output ${OUT}'
+        ),
+        'uglifyjs': Beeld.Compiler(
+            'Node UglifyJS Compiler',
+            'uglifyjs ${IN} ${OPTIONS} -o ${OUT}'
+        ),
+        'closure': Beeld.Compiler(
+            'Java Closure Compiler',
+            'java -jar ${COMPILERS}closure.jar ${EXTRA} ${OPTIONS} --js ${IN} --js_output_file ${OUT}'
+        ),
+        'yui': Beeld.Compiler(
+            'Java YUI Compressor Compiler',
+            'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}'
+        )
+        }
         # fix compiler selection
         options.compiler = options.compiler.lower()
-        if not ( options.compiler in self.compilers): options.compiler = 'uglifyjs'
-        
-        # if args are correct continue
-        # get real-dir of config file
-        full_path = params.configFile = os.path.realpath(options.config)
-        params.basePath = os.path.dirname(full_path)
-        params.cwd = os.getcwd();
-        params.encoding = options.enc.lower()
-        params.selectedCompiler = options.compiler
-        params.selectedTasks = options.tasks.split(',') if options.tasks else False
-        params.compilers = self.compilers
-        configurationFile = read(params.configFile, params.encoding)
-        
+        if options.compiler not in params.compilers: options.compiler = 'uglifyjs'
+        configFile = os.path.realpath(options.config)
+        encoding = options.enc.lower()        
+        ext = file_ext(configFile).lower()
+        if (not len(ext)) or (ext not in Beeld.Parsers): ext="*"
         # parse settings
-        ext = fileExt(full_path).lower()
-        if not len(ext): ext=".custom"
-        
-        # parse dependencies file in JSON format
-        if ".json" == ext: 
-            params.inputType = Beeld.Parsers.JSON.format + ' (' + Beeld.parsers.JSON.ext + ')'
-            config = Beeld.Parsers.JSON.parse( configurationFile )
-        # parse dependencies file in YAML format
-        elif ".yml" == ext or ".yaml" == ext: 
-            params.inputType = Beeld.Parsers.YAML.format + ' (' + Beeld.Parsers.YAML.ext + ')'
-            config = Beeld.Parsers.YAML.parse( configurationFile )
-        # parse dependencies file in custom format
-        else: 
-            params.inputType = Beeld.Parsers.CUSTOM.format + ' (' + Beeld.Parsers.CUSTOM.ext + ')'
-            config = Beeld.Parsers.CUSTOM.parse( configurationFile )
-            
+        parser = Beeld.Parsers[ext]
+        configurationFile = read(configFile, encoding)
+        config = parser.parse(configurationFile)
         if not config: config = {}
-        params.config = config
         #import pprint
-        #pprint.pprint(params.config)
+        #pprint.pprint(config)
         #sys.exit(0)
+        params.options = Beeld.Obj({
+        'configFile': configFile,
+        'inputType': parser.name + ' (' + ext + ')',
+        'basePath': os.path.dirname(configFile),
+        'cwd': os.getcwd(),
+        'encoding': options.enc.lower(),
+        'compiler': options.compiler,
+        'tasks': options.tasks.split(',') if options.tasks else False
+        })
+        params.data = Beeld.Obj()
+        params.current = Beeld.Obj()
+        params.config = config
+        
+        if 'plugins' in config:
+            self.loadPlugins(config['plugins'], params.options.basePath)
+        
         return params
     
     def build(self, params):
-        tasks = None
-        actions = self.actions
-        config = params.config
-        default_actions = [
-         'src'
-        ,'header'
-        ,'replace'
-        ,'preprocess'
-        ,'doc'
-        ,'minify'
-        ,'postprocess'
-        ,'bundle'
-        ,'out'
-        ]
+        tasks = []
+        selected_tasks = None
         
-        params.in_tuple = None
-        params.out_tuple = None
+        params.data.tmp_in = None
+        params.data.tmp_out = None
         
-        abort_process = create_abort_process( )
+        if 'tasks' in params.config:
         
-        if 'tasks' in config:
+            params.config['tasks'] = Beeld.OrderedMap(params.config['tasks'])
+            while params.config['tasks'].hasNext():
+                task = params.config['tasks'].getNext(True)
+                task_name = list(task.keys())[0]
+                tasks.append( task )
+                if params.options.tasks and task_name in params.options.tasks:
+                    if not selected_tasks: selected_tasks = []
+                    selected_tasks.append( task )
         
-            config['tasks'] = Beeld.OrderedMap(config['tasks'])
-            while config['tasks'].hasNext():
-                task = config['tasks'].getNext()
-                self.addTask(task['key'], task['val'])
-                if params.selectedTasks and task['key'] in params.selectedTasks:
-                    if not tasks: tasks = []
-                    tasks.append( [task['key'], task['val']] )
+        if not selected_tasks:
+            if False == params.options.tasks:
+                if len(tasks): selected_tasks = tasks
+                #elif config: selected_tasks = [['default', config]]            
         
-        if not tasks:
-            if False == params.selectedTasks:
-                if len(self.tasks):
-                    tasks = self.tasks
-                elif config:
-                    tasks = [['default', config]]
-            
         
-        if not tasks:
-            params.err = 'Task is not defined'
-            abort_process( )
+        if not selected_tasks:
+            params.data.err = 'Task is not defined'
+            Beeld.Actions.abort( None, params )
         
-        params.config = {}
-        
-        params.in_tuple = tmpfile( )
-        params.out_tuple = tmpfile( )
-        params.currentTask = ''
         params.pipeline = self
+        params.current.tasks = Beeld.OrderedMap(selected_tasks)
+        params.current.actions = self.actions
+        params.current.task_actions = None
+        params.current.task = ''
+        params.current.action = ''
+        params.current.data = None
+        params.data.src = ''
+        params.data.header = ''
+        params.data.bundle = ''
+        params.data.err = False
+        params.data.tmp_in = tmpfile( )
+        params.data.tmp_out = tmpfile( )
         
-        switch_task,finish_process,log_settings = create_tasks( config, tasks, default_actions, actions )
-        
-        self.on('#actions', switch_task).pipeline('#actions', params, abort_process)
+        self.on('#actions', Beeld.Actions.next_task).pipeline('#actions', params, Beeld.Actions.abort)
         
         return self
         

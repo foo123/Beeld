@@ -126,7 +126,7 @@
                             }
                             else
                             {
-                                val = removeComment(val, '#', comm_index);
+                                val = removeComment(val, '#');
                             }
                         }
                     }
