@@ -356,6 +356,10 @@ final class BeeldParser
         $this->parser = null;
     }
 
+    public function __destruct()
+    {
+        $this->dispose();
+    }
     
     public function dispose()
     {
@@ -386,6 +390,11 @@ final class BeeldCompiler
         $this->name = $name;
         $this->cmd_tpl = $cmd;
         $this->options = $options;
+    }
+    
+    public function __destruct()
+    {
+        $this->dispose();
     }
     
     public function dispose()
@@ -939,6 +948,11 @@ class Beeld extends PublishSubscribe
         ,'action_bundle'=> array('BeeldActions', 'action_bundle')
         ,'action_out'=> array('BeeldActions', 'action_out')
         );
+    }
+    
+    public function __destruct()
+    {
+        $this->dispose();
     }
     
     public function dispose( ) 

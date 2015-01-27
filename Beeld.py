@@ -246,7 +246,9 @@ class BeeldParser:
         self.name = name
         self.parser = None
 
-    
+    def __del__(self):
+        self.dispose()
+        
     def dispose(self):
         self.class_name = None
         self.name = None
@@ -276,6 +278,9 @@ class BeeldCompiler:
         self.cmd_tpl = cmd
         self.options = options
     
+    def __del__(self):
+        self.dispose()
+        
     def dispose(self):
         self.name = None
         self.cmd_tpl = None
@@ -748,6 +753,9 @@ class Beeld(PublishSubscribe):
         ,'action_bundle': Beeld.Actions.action_bundle
         ,'action_out': Beeld.Actions.action_out
         }
+        
+    def __del__(self):
+        self.dispose()
         
     def dispose(self):
         self.disposePubSub( )
