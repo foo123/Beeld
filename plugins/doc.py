@@ -1,7 +1,7 @@
 import re
 
 Beeld = None
-def doc(builder, BeeldClass):
+def beeld_plugin_doc(builder, BeeldClass):
     global Beeld
     Beeld = BeeldClass
     builder.addAction('doc', beeld_plugin_action_doc)

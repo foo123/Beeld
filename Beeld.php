@@ -6,7 +6,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.7
+*   @version: 0.7.1
 *
 **/
 if (!class_exists('Beeld'))
@@ -873,7 +873,7 @@ final class BeeldActions
 // extends/implements PublishSubscribe
 class Beeld extends PublishSubscribe
 {
-    const VERSION = "0.7";
+    const VERSION = "0.7.1";
     public static $Parsers = null;
     
     public $actions = null;
@@ -972,7 +972,7 @@ class Beeld extends PublishSubscribe
                 else
                     $filename = BeeldUtils::get_real_path($filename, $basePath);
                 require_once($filename);
-                $loader = $plg[0];
+                $loader = 'beeld_plugin_' . $plg[0];
                 call_user_func( $loader, $this );
             }
         }

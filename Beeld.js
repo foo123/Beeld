@@ -5,7 +5,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.7
+*   @version: 0.7.1
 *
 **/
 !function (root, moduleName, moduleDefinition) {
@@ -406,7 +406,7 @@
         ,'action_out': Beeld.Actions.action_out
         };
     };
-    Beeld.VERSION = "0.7";
+    Beeld.VERSION = "0.7.1";
     
     Beeld.OrderedMap = function( om ){
         return new OrderedMap(om);
@@ -975,7 +975,7 @@
                 else
                     filename = get_real_path(filename, basePath);
                 plugin = require( filename );
-                loader = plugin[ plg[0] ];
+                loader = plugin[ 'beeld_plugin_' + plg[0] ];
                 loader( this, Beeld );
             }
         }

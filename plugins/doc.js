@@ -2,7 +2,7 @@
 
 module.exports = {
     
-    doc: function( builder, Beeld ) {
+    beeld_plugin_doc: function( builder, Beeld ) {
         var HAS = 'hasOwnProperty', 
             write_async = Beeld.Utils.write_async,
             get_real_path = Beeld.Utils.get_real_path

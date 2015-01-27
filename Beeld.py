@@ -5,7 +5,7 @@
 #   https://github.com/foo123/Beeld
 #
 #   A scriptable and configurable source code builder framework in Node/PHP/Python
-#   @version: 0.7
+#   @version: 0.7.1
 #
 ##
 
@@ -717,7 +717,7 @@ BeeldParsers['*'] = BeeldParsers['.custom']
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
     
-    VERSION = "0.7"
+    VERSION = "0.7.1"
     
     def OrderedMap(om):
         return OrderedMap(om)
@@ -771,7 +771,7 @@ class Beeld(PublishSubscribe):
                     filename  = BEELD_PLUGINS + filename[plgidlen:]
                 else:
                     filename = get_real_path( filename, basePath )
-                loader = getattr(import_path(filename), plg[0])
+                loader = getattr(import_path(filename), 'beeld_plugin_' + plg[0])
                 loader( self, Beeld )
         
         return self

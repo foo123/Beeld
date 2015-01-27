@@ -1,5 +1,5 @@
 <?php
-function doc($builder)
+function beeld_plugin_doc($builder)
 {
     $builder->addAction('doc', 'beeld_plugin_action_doc');
 }
