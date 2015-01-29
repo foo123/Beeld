@@ -2,7 +2,7 @@
 *
 *   Xpresion
 *   Simple eXpression parser engine with variables and custom functions support for PHP, Python, Node/JS, ActionScript
-*   @version: 0.5
+*   @version: 0.5.1
 *
 *   https://github.com/foo123/Xpresion
 *
@@ -34,7 +34,7 @@
     
     "use strict";
     
-    var __version__ = "0.5",
+    var __version__ = "0.5.1",
     
         PROTO = 'prototype', HAS = 'hasOwnProperty', 
         toJSON = JSON.stringify, Keys = Object.keys, Extend = Object.create,
@@ -49,7 +49,7 @@
         
         Tpl, Node, Alias, Tok, Op, Func, Xpresion,
         BLOCKS = 'BLOCKS', OPS = 'OPERATORS', FUNCS = 'FUNCTIONS',
-        __inited = false
+        __inited = false, __configured = false
     ;
     
     /*function trace( stack )
@@ -247,6 +247,8 @@
             while ( (entry instanceof Alias) && entries[HAS](entry.alias) ) 
             {
                 id = entry.alias;
+                // circular reference
+                if (entry === entries[ id ]) return false;
                 entry = entries[ id ];
             }
             return entry;
@@ -478,7 +480,7 @@
     };
     
     Xpresion.parse = function( xpr ) {
-        var self = xpr, expr, l
+        var expr, l
             
             ,e, ch, v
             ,i, m, t, AST, OPS, NOPS, t_index
@@ -486,18 +488,18 @@
             ,reduce = Xpresion.reduce
             ,get_entry = Alias.get_entry
             
-            ,RE = self.RE, BLOCK = self[BLOCKS], block, block_rest
+            ,RE = xpr.RE, BLOCK = xpr[BLOCKS], block, block_rest
             ,t_var_is_also_ident = !RE[HAS]('t_var')
             ,evaluator
             ,err = 0, errpos, errmsg
         ;
         
-        expr = self.source;
+        expr = xpr.source;
         l = expr.length;
-        self._cnt = 0;
-        self._symbol_table = { };
-        self._cache = { };
-        self.variables = { };
+        xpr._cnt = 0;
+        xpr._symbol_table = { };
+        xpr._cache = { };
+        xpr.variables = { };
         AST = [ ]; OPS = [ ]; NOPS = [ ]; 
         t_index = 0; i = 0;
         
@@ -523,7 +525,7 @@
                     }
                     i += block_rest.length;
                     
-                    t = self.t_block( v, block.type, block_rest );
+                    t = xpr.t_block( v, block.type, block_rest );
                     if ( false !== t )
                     {
                         t_index+=1;
@@ -543,7 +545,7 @@
 
             if ( m = e.match( RE.t_num ) ) // number
             {
-                t = self.t_liter( m[ 1 ], T_NUM );
+                t = xpr.t_liter( m[ 1 ], T_NUM );
                 if ( false !== t )
                 {
                     t_index+=1;
@@ -555,7 +557,7 @@
             
             if ( m = e.match( RE.t_ident ) ) // ident, reserved, function, operator, etc..
             {
-                t = self.t_liter( m[ 1 ], T_IDE ); // reserved keyword
+                t = xpr.t_liter( m[ 1 ], T_IDE ); // reserved keyword
                 if ( false !== t )
                 {
                     t_index+=1;
@@ -563,7 +565,7 @@
                     i += m[ 0 ].length;
                     continue;
                 }
-                t = self.t_op( m[ 1 ] ); // (literal) operator
+                t = xpr.t_op( m[ 1 ] ); // (literal) operator
                 if ( false !== t )
                 {
                     t_index+=1;
@@ -573,7 +575,7 @@
                 }
                 if ( t_var_is_also_ident )
                 {
-                    t = self.t_var( m[ 1 ] ); // variables are also same identifiers
+                    t = xpr.t_var( m[ 1 ] ); // variables are also same identifiers
                     if ( false !== t )
                     {
                         t_index+=1;
@@ -589,7 +591,7 @@
                 v = m[ 1 ]; t = false;
                 while ( v.length > 0 ) // try to match maximum length op/func
                 {
-                    t = self.t_op( v ); // function, (non-literal) operator
+                    t = xpr.t_op( v ); // function, (non-literal) operator
                     if ( false !== t ) break;
                     v = v.slice( 0, -1 );
                 }
@@ -604,7 +606,7 @@
             
             if ( !t_var_is_also_ident && (m = e.match( RE.t_var )) ) // variables
             {
-                t = self.t_var( m[ 1 ] );
+                t = xpr.t_var( m[ 1 ] );
                 if ( false !== t )
                 {
                     t_index+=1;
@@ -616,7 +618,7 @@
             
             if ( m = e.match( RE.t_nonspc ) ) // other non-space tokens/symbols..
             {
-                t = self.t_liter( m[ 1 ], T_LIT ); // reserved keyword
+                t = xpr.t_liter( m[ 1 ], T_LIT ); // reserved keyword
                 if ( false !== t )
                 {
                     t_index+=1;
@@ -624,7 +626,7 @@
                     i += m[ 0 ].length;
                     continue;
                 }
-                t = self.t_op( m[ 1 ] ); // function, other (non-literal) operator
+                t = xpr.t_op( m[ 1 ] ); // function, other (non-literal) operator
                 if ( false !== t )
                 {
                     t_index+=1;
@@ -632,7 +634,7 @@
                     i += m[ 0 ].length;
                     continue;
                 }
-                t = self.t_tok( m[ 1 ] );
+                t = xpr.t_tok( m[ 1 ] );
                 t_index+=1;
                 AST.push( t.node(null, t_index) ); // pass-through ..
                 i += m[ 0 ].length;
@@ -654,7 +656,7 @@
             
             try {
                 
-                evaluator = self.compile( AST[0] );
+                evaluator = xpr.compile( AST[0] );
             
             } catch( e ) {
                 
@@ -664,27 +666,27 @@
         }
         
         NOPS = null; OPS = null; AST = null;
-        self._symbol_table = null;
+        xpr._symbol_table = null;
         
         if ( err )
         {
             evaluator = null;
-            self.variables = [ ];
-            self._cnt = 0;
-            self._cache = { };
-            self._evaluator_str = '';
-            self._evaluator = self.dummy_evaluator;
+            xpr.variables = [ ];
+            xpr._cnt = 0;
+            xpr._cache = { };
+            xpr._evaluator_str = '';
+            xpr._evaluator = xpr.dummy_evaluator;
             console.error( 'Xpresion Error: ' + errmsg + ' at ' + expr );
         }
         else
         {
             // make array
-            self.variables = Keys( self.variables );
-            self._evaluator_str = evaluator[0];
-            self._evaluator = evaluator[1];
+            xpr.variables = Keys( xpr.variables );
+            xpr._evaluator_str = evaluator[0];
+            xpr._evaluator = evaluator[1];
         }
         
-        return self; 
+        return xpr; 
     };
         
     Xpresion.render = function( tok, args ) { 
@@ -849,6 +851,7 @@
             return new Op(input, fixity, associativity, priority, arity, output, otype, ofixity);
         
         input = input || '';
+        output = output || '';
         self.parts = [].concat( input );
         
         // n-ary/multi-part operator
@@ -856,13 +859,15 @@
         // default operator
         else self.type = T_OP;
         
+        if ( output && !(output instanceof Tpl) ) output = Tpl(output);
+        
         Tok.call(self, self.type, self.parts[0], output);
         
         self.fixity = fixity || PREFIX;
         self.associativity = associativity || DEFAULT;
         self.priority = priority || 1000;
         self.arity = arity || 0;
-        self.otype = otype;
+        self.otype = undef !== otype ? otype : T_DFT;
         self.ofixity = undef !== ofixity ? ofixity : self.fixity;
         self.parenthesize = false;
         self.revert = false;
@@ -871,7 +876,7 @@
     Op.Condition = function( f ) {
         return ['function'===typeof f[0] 
                 ? f[0] 
-                : Tpl.compile(Tpl.multisplit(f[0],{'${POS}':0,'${TOKS}':1,'${OPS}':2,'${TOK}':3,'${OP}':4,'${PREV_IS_OP}':5,'${DEDUCED_TYPE}':6,'${XPRESION}':7}), true),
+                : Tpl.compile(Tpl.multisplit(f[0],{'${POS}':0,'${TOKS}':1,'${OPS}':2,'${TOK}':3,'${OP}':4,'${PREV_IS_OP}':5,'${DEDUCED_TYPE}':6,'Xpresion':7}), true),
                 f[1]];
     };
     Op[PROTO] = Extend( Tok[PROTO] );
@@ -969,7 +974,7 @@
     Xpresion.Func = Func = function Func( input, output, otype, priority, associativity, fixity ) {
         var self = this;
         if ( !(self instanceof Func) ) return new Func(input, output, otype, priority, associativity, fixity);
-        Op.call(self, input, PREFIX, associativity || RIGHT, priority, 1, output, otype, fixity||PREFIX);
+        Op.call(self, input, PREFIX, associativity||RIGHT, priority||5, 1, output, otype, fixity||PREFIX);
         self.type = T_FUN;
     };
     Func[PROTO] = Extend( Op[PROTO] );
@@ -1131,123 +1136,219 @@
         ,t_tok: function( token ) { return Tok(T_DFT, token, token); }
     };
     
-    Xpresion.init = function( ) {
-    if ( __inited ) return;
+    Xpresion.init = function( andConfigure ) {
+        if ( __inited ) return;
+        Xpresion[OPS] = {};
+        Xpresion[FUNCS] = {};
+        Xpresion.Fn = {};
+        Xpresion.RE = {};
+        Xpresion[BLOCKS] = {};
+        Xpresion.Reserved = {};
+        Xpresion.defRuntimeFunc({
+         'INF'      : Infinity
+        ,'NAN'      : NaN
+        ,'clamp'    :   function( v, m, M ){ 
+            if ( m > M ) return v > m ? m : (v < M ? M : v); 
+            else return v > M ? M : (v < m ? m : v); 
+        }
+        ,'len'    :   function( v ){ 
+            if ( v )
+            {
+                if ( v.substr || v.push ) return v.length;
+                if ( Object === v.constructor ) return Keys(v).length;
+                return 1;
+            }
+            return 0;
+        }
+        ,'sum'      :   function( ){
+            var args = arguments, i, l, s = 0;
+            if (args[0] && Array === args[0].constructor ) args = args[0];
+            l = args.length;
+            if ( l > 0 ) { for(i=0; i<l; i++) s += args[i]; }
+            return s;
+        }
+        ,'avg'      :   function( ){
+            var args = arguments, i, l, s = 0;
+            if (args[0] && Array === args[0].constructor ) args = args[0];
+            l = args.length;
+            if ( l > 0 ) { for(i=0; i<l; i++) s += args[i]; s = s/l;}
+            return s;
+        }
+        ,'ary_eq'   :   function(a1, a2){
+            var l = a1.length, i;
+            if ( l===a2.length )
+            {
+                for (i=0; i<l; i++) 
+                    if ( a1[i]!=a2[i] ) return false;
+            }
+            else return false;
+            return true;
+        }
+        ,'ary_merge'   :   function(a1, a2){
+            return [].concat(a1,a2);
+        }
+        ,'match'  :   function( str, regex ){ return regex.test( str ); }
+        ,'contains':  function( list, item ){ return -1 < list.indexOf( item ); }
+        });
+        __inited = true;
+        if ( true === andConfigure ) Xpresion.defaultConfiguration( );
+    };
     
-    Xpresion[OPS] = {
+    Xpresion.defaultConfiguration = function( ) {
+    if ( __configured ) return;
+    
+    Xpresion.defOp({
     // e.g https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
-    /*----------------------------------------------------------------------------------------
-     symbol           input,    fixity,  associativity, priority, arity, output,     output_type
-    ------------------------------------------------------------------------------------------*/
-                  // bra-kets as n-ary operators
-     '('    :     Op(['(',')'], POSTFIX, RIGHT,          1,        1,    Tpl('$0'),   T_DUM )
-    ,')'    :     Op(')')
+    /*------------------------------------------------------------------------------------------------
+     symbol     input       ,fixity     ,associativity  ,priority   ,arity  ,output     ,output_type
+    --------------------------------------------------------------------------------------------------*/
+                // bra-kets as n-ary operators
+     '('    :   Op(
+                ['(',')']   ,POSTFIX    ,RIGHT          ,1          ,1      ,'$0'       ,T_DUM 
+                )
+    ,')'    :   Op(')')
+    ,'['    :   Op(
+                ['[',']']   ,POSTFIX    ,RIGHT          ,2          ,1      ,'[$0]'     ,T_ARY 
+                )
+    ,']'    :   Op(']')
+    ,','    :   Op(
+                ','         ,INFIX      ,LEFT           ,3          ,2      ,'$0,$1'    ,T_DFT 
+                )
+                // n-ary (ternary) if-then-else operator
+    ,'?'    :   Op(
+                ['?',':']   ,INFIX      ,RIGHT          ,100        ,3      ,'($0?$1:$2)'   ,T_BOL 
+                )
+    ,':'    :   Op(':')
     
-    ,'['    :     Op(['[',']'], POSTFIX, RIGHT,          2,        1,    Tpl('[$0]'), T_ARY )
-    ,']'    :     Op(']')
-    
-    ,','    :     Op(',',       INFIX,   LEFT,           3,        2,    Tpl('$0,$1'), T_DFT )
-                  // n-ary (ternary) if-then-else operator
-    ,'?'    :     Op(['?',':'], INFIX,   RIGHT,        100,        3,    Tpl('($0?$1:$2)'), T_BOL )
-    ,':'    :     Op(':')
-    
-    ,'!'    :     Op('!',       PREFIX,  RIGHT,         10,        1,    Tpl('!$0'), T_BOL )
-    ,'~'    :     Op('~',       PREFIX,  RIGHT,         10,        1,    Tpl('~$0'), T_NUM )
-    
-    ,'^'    :     Op('^',       INFIX,   RIGHT,         11,        2,    Tpl('Math.pow($0,$1)'), T_NUM, PREFIX )
-    ,'*'    :     Op('*',       INFIX,   LEFT,          20,        2,    Tpl('($0*$1)'), T_NUM ) 
-    ,'/'    :     Op('/',       INFIX,   LEFT,          20,        2,    Tpl('($0/$1)'), T_NUM )
-    ,'%'    :     Op('%',       INFIX,   LEFT,          20,        2,    Tpl('($0%$1)'), T_NUM )
-                  // addition/concatenation/unary plus as polymorphic operators
-    ,'+'    :     Op().Polymorphic([
-                  // array concatenation
-                  ["${TOK} && !${PREV_IS_OP} && (${DEDUCED_TYPE}===${XPRESION}.T_ARY)",
-                  Op('+',       INFIX,   LEFT,          25,        2,    Tpl('Fn.ary_merge($0,$1)'), T_ARY )]
-                  // string concatenation
-                  ,["${TOK} && !${PREV_IS_OP} && (${DEDUCED_TYPE}===${XPRESION}.T_STR)",
-                  Op('+',       INFIX,   LEFT,          25,        2,    Tpl('($0+String($1))'), T_STR )]
-                  // numeric addition
-                  ,["${TOK} && !${PREV_IS_OP}",
-                  Op('+',       INFIX,   LEFT,          25,        2,    Tpl('($0+$1)'),  T_NUM )]
-                  // unary plus
-                  ,["!${TOK} || ${PREV_IS_OP}",
-                  Op('+',       PREFIX,  RIGHT,          4,        1,    Tpl('$0'),  T_NUM )]
-                  ])
-    
-    ,'-'    :     Op().Polymorphic([
-                  // numeric subtraction
-                  ["${TOK} && !${PREV_IS_OP}",
-                  Op('-',       INFIX,   LEFT,          25,        2,    Tpl('($0-$1)'), T_NUM )]
-                  // unary negation
-                  ,["!${TOK} || ${PREV_IS_OP}",
-                  Op('-',       PREFIX,  RIGHT,          4,        1,    Tpl('(-$0)'),  T_NUM )]
-                  ])
-    
-    ,'>>'   :     Op('>>',      INFIX,   LEFT,          30,        2,    Tpl('($0>>$1)'), T_NUM )
-    ,'<<'   :     Op('<<',      INFIX,   LEFT,          30,        2,    Tpl('($0<<$1)'), T_NUM )
-    
-    ,'>'    :     Op('>',       INFIX,   LEFT,          35,        2,    Tpl('($0>$1)'),  T_BOL )
-    ,'<'    :     Op('<',       INFIX,   LEFT,          35,        2,    Tpl('($0<$1)'),  T_BOL )
-    ,'>='   :     Op('>=',      INFIX,   LEFT,          35,        2,    Tpl('($0>=$1)'), T_BOL )
-    ,'<='   :     Op('<=',      INFIX,   LEFT,          35,        2,    Tpl('($0<=$1)'), T_BOL )
-    
-    ,'=='   :     Op().Polymorphic([
-                  // array equivalence
-                  ["${DEDUCED_TYPE}===${XPRESION}.T_ARY",
-                  Op('==',      INFIX,   LEFT,          40,        2,    Tpl('Fn.ary_eq($0,$1)'), T_BOL )]
-                  // default equivalence
-                  ,["true",
-                  Op('==',      INFIX,   LEFT,          40,        2,    Tpl('($0==$1)'), T_BOL )]
-                  ])
-    
-    ,'!='   :     Op('!=',      INFIX,   LEFT,          40,        2,    Tpl('($0!=$1)'), T_BOL )
-    
-    ,'matches' :  Op('matches', INFIX,   NONE,          40,        2,    Tpl('$0.test($1)'), T_BOL )
-    ,'in'   :     Op('in',      INFIX,   NONE,          40,        2,    Tpl('(-1<$1.indexOf($0))'), T_BOL )
-    ,'has'     :  Op('has',     INFIX,   NONE,          40,        2,    Tpl('(-1<$0.indexOf($1))'), T_BOL )
-    
-    ,'&'    :     Op('&',       INFIX,   LEFT,          45,        2,    Tpl('($0&$1)'),  T_NUM )
-    ,'|'    :     Op('|',       INFIX,   LEFT,          46,        2,    Tpl('($0|$1)'),  T_NUM )
-    
-    ,'&&'   :     Op('&&',      INFIX,   LEFT,          47,        2,    Tpl('($0&&$1)'), T_BOL )
-    ,'||'   :     Op('||',      INFIX,   LEFT,          48,        2,    Tpl('($0||$1)'), T_BOL )
-     
+    ,'!'    :   Op(
+                '!'         ,PREFIX     ,RIGHT          ,10         ,1      ,'!$0'      ,T_BOL 
+                )
+    ,'~'    :   Op(
+                '~'         ,PREFIX     ,RIGHT          ,10         ,1      ,'~$0'      ,T_NUM 
+                )
+    ,'^'    :   Op(
+                '^'         ,INFIX      ,RIGHT          ,11         ,2      ,'Math.pow($0,$1)'  ,T_NUM 
+                )
+    ,'*'    :   Op(
+                '*'         ,INFIX      ,LEFT           ,20         ,2      ,'($0*$1)'  ,T_NUM 
+                ) 
+    ,'/'    :   Op(
+                '/'         ,INFIX      ,LEFT           ,20         ,2      ,'($0/$1)'  ,T_NUM 
+                )
+    ,'%'    :   Op(
+                '%'         ,INFIX      ,LEFT           ,20         ,2      ,'($0%$1)'  ,T_NUM 
+                )
+                // addition/concatenation/unary plus as polymorphic operators
+    ,'+'    :   Op().Polymorphic([
+                // array concatenation
+                ["${TOK} && !${PREV_IS_OP} && (${DEDUCED_TYPE}===Xpresion.T_ARY)", Op(
+                '+'         ,INFIX      ,LEFT           ,25         ,2      ,'Fn.ary_merge($0,$1)'  ,T_ARY 
+                )]
+                // string concatenation
+                ,["${TOK} && !${PREV_IS_OP} && (${DEDUCED_TYPE}===Xpresion.T_STR)", Op(
+                '+'         ,INFIX      ,LEFT           ,25         ,2      ,'($0+String($1))'  ,T_STR 
+                )]
+                // numeric addition
+                ,["${TOK} && !${PREV_IS_OP}", Op(
+                '+'         ,INFIX      ,LEFT           ,25         ,2      ,'($0+$1)'  ,T_NUM 
+                )]
+                // unary plus
+                ,["!${TOK} || ${PREV_IS_OP}", Op(
+                '+'         ,PREFIX     ,RIGHT          ,4          ,1      ,'$0'       ,T_NUM 
+                )]
+                ])
+    ,'-'    :   Op().Polymorphic([
+                // numeric subtraction
+                ["${TOK} && !${PREV_IS_OP}", Op(
+                '-'         ,INFIX      ,LEFT           ,25         ,2      ,'($0-$1)'  ,T_NUM 
+                )]
+                // unary negation
+                ,["!${TOK} || ${PREV_IS_OP}", Op(
+                '-'         ,PREFIX     ,RIGHT          ,4          ,1      ,'(-$0)'        ,T_NUM 
+                )]
+                ])
+    ,'>>'   :   Op(
+                '>>'        ,INFIX      ,LEFT           ,30         ,2      ,'($0>>$1)'     ,T_NUM 
+                )
+    ,'<<'   :   Op(
+                '<<'        ,INFIX      ,LEFT           ,30         ,2      ,'($0<<$1)'     ,T_NUM 
+                )
+    ,'>'    :   Op(
+                '>'         ,INFIX      ,LEFT           ,35         ,2      ,'($0>$1)'      ,T_BOL 
+                )
+    ,'<'    :   Op(
+                '<'         ,INFIX      ,LEFT           ,35         ,2      ,'($0<$1)'      ,T_BOL 
+                )
+    ,'>='   :   Op(
+                '>='        ,INFIX      ,LEFT           ,35         ,2      ,'($0>=$1)'     ,T_BOL 
+                )
+    ,'<='   :   Op(
+                '<='        ,INFIX      ,LEFT           ,35         ,2      ,'($0<=$1)'     ,T_BOL 
+                )
+    ,'=='   :   Op().Polymorphic([
+                // array equivalence
+                ["${DEDUCED_TYPE}===Xpresion.T_ARY", Op(
+                '=='        ,INFIX      ,LEFT           ,40         ,2      ,'Fn.ary_eq($0,$1)' ,T_BOL 
+                )]
+                // default equivalence
+                ,["true", Op(
+                '=='        ,INFIX      ,LEFT           ,40         ,2      ,'($0==$1)'     ,T_BOL 
+                )]
+                ])
+    ,'!='   :   Op(
+                '!='        ,INFIX      ,LEFT           ,40         ,2      ,'($0!=$1)'     ,T_BOL 
+                )
+    ,'matches': Op(
+                'matches'   ,INFIX      ,NONE           ,40         ,2      ,'$0.test($1)'  ,T_BOL 
+                )
+    ,'in'   :   Op(
+                'in'        ,INFIX      ,NONE           ,40         ,2      ,'(-1<$1.indexOf($0))'  ,T_BOL 
+                )
+    ,'has'  :   Op(
+                'has'       ,INFIX      ,NONE           ,40         ,2      ,'(-1<$0.indexOf($1))'  ,T_BOL 
+                )
+    ,'&'    :   Op(
+                '&'         ,INFIX      ,LEFT           ,45         ,2      ,'($0&$1)'      ,T_NUM 
+                )
+    ,'|'    :   Op(
+                '|'         ,INFIX      ,LEFT           ,46         ,2      ,'($0|$1)'      ,T_NUM 
+                )
+    ,'&&'   :   Op(
+                '&&'        ,INFIX      ,LEFT           ,47         ,2      ,'($0&&$1)'     ,T_BOL 
+                )
+    ,'||'   :   Op(
+                '||'        ,INFIX      ,LEFT           ,48         ,2      ,'($0||$1)'     ,T_BOL 
+                )
     /*------------------------------------------
                     aliases
      -------------------------------------------*/
-    ,'or'    :    Alias( '||' )
-    ,'and'   :    Alias( '&&' )
-    ,'not'   :    Alias( '!' )
-    };
+    ,'or'    :  Alias( '||' )
+    ,'and'   :  Alias( '&&' )
+    ,'not'   :  Alias( '!' )
+    });
     
-    Xpresion[FUNCS] = {
-    /*-----------------------------------------------------------------------
-    symbol              input,    output,          output_type,priority
-    -------------------------------------------------------------------------*/
-     'min'      : Func('min',   Tpl('Math.min($0)'),  T_NUM,   5  )
-    ,'max'      : Func('max',   Tpl('Math.max($0)'),  T_NUM,   5  )
-    ,'pow'      : Func('pow',   Tpl('Math.pow($0)'),  T_NUM,   5  )
-    ,'sqrt'     : Func('sqrt',  Tpl('Math.sqrt($0)'), T_NUM,   5  )
-    ,'len'      : Func('len',   Tpl('Fn.len($0)'),    T_NUM,   5  )
-    ,'int'      : Func('int',   Tpl('parseInt($0)'),  T_NUM,   5  )
-    ,'str'      : Func('str',   Tpl('String($0)'),  T_STR,   5  )
-    //,'iif'      : Func('iif',   Tpl('Fn.iif($0)'),    T_BOL,   5  )
-    ,'clamp'    : Func('clamp', Tpl('Fn.clamp($0)'),  T_NUM,   5  )
-    ,'sum'      : Func('sum',   Tpl('Fn.sum($0)'),    T_NUM,   5  )
-    ,'avg'      : Func('avg',   Tpl('Fn.avg($0)'),    T_NUM,   5  )
+    Xpresion.defFunc({
+    /*-----------------------------------------------------------------------------------
+    symbol              input   ,output             ,output_type    ,priority(default 5)
+    ------------------------------------------------------------------------------------*/
+     'min'      : Func('min'    ,'Math.min($0)'     ,T_NUM  )
+    ,'max'      : Func('max'    ,'Math.max($0)'     ,T_NUM  )
+    ,'pow'      : Func('pow'    ,'Math.pow($0)'     ,T_NUM  )
+    ,'sqrt'     : Func('sqrt'   ,'Math.sqrt($0)'    ,T_NUM  )
+    ,'len'      : Func('len'    ,'Fn.len($0)'       ,T_NUM  )
+    ,'int'      : Func('int'    ,'parseInt($0)'     ,T_NUM  )
+    ,'str'      : Func('str'    ,'String($0)'       ,T_STR  )
+    ,'clamp'    : Func('clamp'  ,'Fn.clamp($0)'     ,T_NUM  )
+    ,'sum'      : Func('sum'    ,'Fn.sum($0)'       ,T_NUM  )
+    ,'avg'      : Func('avg'    ,'Fn.avg($0)'       ,T_NUM  )
     /*---------------------------------------
                     aliases
      ----------------------------------------*/
      // ...
-    };
+    });
     
     // function implementations (can also be overriden per instance/evaluation call)
-    Xpresion.Fn = {
-     /*'toint'    :   function( v, base ){ return parseInt( v, base || 10 ); }
-    ,'tostr'    :   function( v ){ return String(v) }*/
-    /*,'iif'      :   function( cond, if_branch, else_branch ){ 
-        return !!cond ? if_branch : else_branch; 
-    }*/
+    /*Xpresion.defRuntimeFunc({
      'clamp'    :   function( v, m, M ){ 
         if ( m > M ) return v > m ? m : (v < M ? M : v); 
         else return v > M ? M : (v < m ? m : v); 
@@ -1290,9 +1391,9 @@
     }
     ,'match'  :   function( str, regex ){ return regex.test( str ); }
     ,'contains':  function( list, item ){ return -1 < list.indexOf( item ); }
-    };
+    });*/
     
-    Xpresion.RE = {
+    Xpresion.defRE({
     /*-----------------------------------------------
     token                re
     -------------------------------------------------*/
@@ -1302,9 +1403,9 @@
     ,'t_num'        :  /^(\d+(\.\d+)?)/
     ,'t_ident'      :  /^([a-zA-Z_][a-zA-Z0-9_]*)\b/
     ,'t_var'        :  /^\$([a-zA-Z0-9_][a-zA-Z0-9_.]*)\b/
-    };
+    });
     
-    Xpresion[BLOCKS] = {
+    Xpresion.defBlock({
      '\'': {
         type: T_STR, 
         parse: Xpresion.parse_delimited_block
@@ -1349,20 +1450,20 @@
     return rest;
     }
     }*/
-    };
+    });
     
-    Xpresion.Reserved = {
+    Xpresion.defReserved({
      'null'     : Tok(T_IDE, 'null', 'null')
     ,'false'    : Tok(T_BOL, 'false', 'false')
     ,'true'     : Tok(T_BOL, 'true', 'true')
-    ,'infinity' : Tok(T_NUM, 'Infinity', 'Infinity')
-    ,'nan'      : Tok(T_NUM, 'NaN', 'NaN')
+    ,'infinity' : Tok(T_NUM, 'Infinity', 'Fn.INF')
+    ,'nan'      : Tok(T_NUM, 'NaN', 'Fn.NAN')
     // aliases
     ,'none'     : Alias('null')
-    ,'inf'      : Alias('inf')
-    };
+    ,'inf'      : Alias('infinity')
+    });
     
-    __inited = true;
+    __configured = true;
     };
     
     // init it

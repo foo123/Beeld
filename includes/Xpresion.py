@@ -3,7 +3,7 @@
 #
 #   Xpresion
 #   Simple eXpression parser engine with variables and custom functions support for PHP, Python, Node/JS, ActionScript
-#   @version: 0.5
+#   @version: 0.5.1
 #
 #   https://github.com/foo123/Xpresion
 #
@@ -408,6 +408,8 @@ class Alias:
             entry = entries[ id ]
             while isinstance(entry, Alias) and (entry.alias in entries):
                 id = entry.alias
+                # circular reference
+                if entry == entries[ id ]: return False
                 entry = entries[ id ]
             return entry
         return False
@@ -491,7 +493,7 @@ class Op(Tok):
 
     def Condition(f):
         return [
-            f[0] if callable(f[0]) else Tpl.compile(Tpl.multisplit(f[0],{'${POS}':0,'${TOKS}':1,'${OPS}':2,'${TOK}':3,'${OP}':4,'${PREV_IS_OP}':5,'${DEDUCED_TYPE}':6,'${XPRESION}':7}), True)
+            f[0] if callable(f[0]) else Tpl.compile(Tpl.multisplit(f[0],{'${POS}':0,'${TOKS}':1,'${OPS}':2,'${TOK}':3,'${OP}':4,'${PREV_IS_OP}':5,'${DEDUCED_TYPE}':6,'Xpresion':7}), True)
             ,f[1]
         ]
     
@@ -504,13 +506,15 @@ class Op(Tok):
             self.parts = [input]
             self.type = T_OP
         
+        if not isinstance(output, Tpl): output = Tpl(output)
+        
         super(Op, self).__init__(self.type, self.parts[0], output)
         
         self.fixity = fixity if None!=fixity else PREFIX
         self.associativity = associativity if None!=associativity else DEFAULT
         self.priority = priority
         self.arity = arity
-        self.otype = otype
+        self.otype = otype if None!=otype else T_DFT
         self.ofixity = ofixity if None!=ofixity else self.fixity
         self.parenthesize = False
         self.revert = False
@@ -610,6 +614,9 @@ class Func(Op):
         
 
 class Fn:
+    INF = float("inf")
+    NAN = float("nan")
+    
     # function implementations (can also be overriden per instance/evaluation call)
     def pow(base, exponent):
         return base ** exponent
@@ -662,7 +669,7 @@ class Fn:
         return True
 
     def match(s, regex): 
-        return bool(regex.match( s ))
+        return bool(re.search(regex, s ))
 
     def contains(l, item): 
         return bool(item in l)
@@ -674,7 +681,7 @@ class Xpresion:
     https://github.com/foo123/Xpresion
     """
     
-    VERSION = "0.5"
+    VERSION = "0.5.1"
     
     COMMA       = COMMA
     LPAREN      = LPAREN
@@ -705,6 +712,7 @@ class Xpresion:
     T_FUN       = T_FUN    
     
     _inited = False
+    _configured = False
     
     Tpl = Tpl
     Node = Node
@@ -828,21 +836,20 @@ class Xpresion:
         return p
     
     def parse(xpr):
-        self = xpr
         get_entry = Alias.get_entry
         reduce = Xpresion.reduce
-        RE = self.RE
-        BLOCK = self.BLOCKS
+        RE = xpr.RE
+        BLOCK = xpr.BLOCKS
         t_var_is_also_ident = 't_var' not in RE
         
         err = 0
         
-        expr = self.source
+        expr = xpr.source
         l = len(expr)
-        self._cnt = 0
-        self._symbol_table = { }
-        self._cache = { }
-        self.variables = { }
+        xpr._cnt = 0
+        xpr._symbol_table = { }
+        xpr._cache = { }
+        xpr.variables = { }
         AST = [ ] 
         OPS = [ ]
         NOPS = [ ]
@@ -873,7 +880,7 @@ class Xpresion:
                     
                     i += len(block_rest)
                     
-                    t = self.t_block( v, block['type'], block_rest )
+                    t = xpr.t_block( v, block['type'], block_rest )
                     if False != t:
                     
                         t_index+=1
@@ -895,7 +902,7 @@ class Xpresion:
             m = RE['t_num'].match(e)
             if m: # number
             
-                t = self.t_liter( m.group( 1 ), T_NUM )
+                t = xpr.t_liter( m.group( 1 ), T_NUM )
                 if False != t:
                 
                     t_index+=1
@@ -908,7 +915,7 @@ class Xpresion:
             m = RE['t_ident'].match(e)
             if m: # ident, reserved, function, operator, etc..
             
-                t = self.t_liter( m.group( 1 ), T_IDE ) # reserved keyword
+                t = xpr.t_liter( m.group( 1 ), T_IDE ) # reserved keyword
                 if False != t:
                 
                     t_index+=1
@@ -916,7 +923,7 @@ class Xpresion:
                     i += len(m.group( 0 ))
                     continue
                 
-                t = self.t_op( m.group( 1 ) ) # (literal) operator
+                t = xpr.t_op( m.group( 1 ) ) # (literal) operator
                 if False != t:
                 
                     t_index+=1
@@ -926,7 +933,7 @@ class Xpresion:
                 
                 if t_var_is_also_ident:
                 
-                    t = self.t_var( m.group( 1 ) ) # variables are also same identifiers
+                    t = xpr.t_var( m.group( 1 ) ) # variables are also same identifiers
                     if False != t:
                     
                         t_index+=1
@@ -943,7 +950,7 @@ class Xpresion:
                 t = False
                 while len(v) > 0: # try to match maximum length op/func
                 
-                    t = self.t_op( v ) # function, (non-literal) operator
+                    t = xpr.t_op( v ) # function, (non-literal) operator
                     if False != t: break
                     v = v[0:-1]
                 
@@ -960,7 +967,7 @@ class Xpresion:
                 m = RE['t_var'].match(e)
                 if m: # variables
                 
-                    t = self.t_var( m.group( 1 ) )
+                    t = xpr.t_var( m.group( 1 ) )
                     if False != t:
                     
                         t_index+=1
@@ -973,7 +980,7 @@ class Xpresion:
             m = RE['t_nonspc'].match(e)
             if m: # other non-space tokens/symbols..
             
-                t = self.t_liter( m.group( 1 ), T_LIT ) # reserved keyword
+                t = xpr.t_liter( m.group( 1 ), T_LIT ) # reserved keyword
                 if False != t:
                 
                     t_index+=1
@@ -981,7 +988,7 @@ class Xpresion:
                     i += len(m.group( 0 ))
                     continue
                 
-                t = self.t_op( m.group( 1 ) ) # function, other (non-literal) operator
+                t = xpr.t_op( m.group( 1 ) ) # function, other (non-literal) operator
                 if False != t:
                 
                     t_index+=1
@@ -989,7 +996,7 @@ class Xpresion:
                     i += len(m.group( 0 ))
                     continue
                 
-                t = self.t_tok( m.group( 1 ) )
+                t = xpr.t_tok( m.group( 1 ) )
                 t_index+=1
                 AST.append( t.node(None, t_index) ) # pass-through ..
                 i += len(m.group( 0 ))
@@ -1008,7 +1015,7 @@ class Xpresion:
             
             try:
                 
-                evaluator = self.compile( AST[0] )
+                evaluator = xpr.compile( AST[0] )
             
             except BaseException as e:
                 
@@ -1019,23 +1026,23 @@ class Xpresion:
         NOPS = None 
         OPS = None 
         AST = None
-        self._symbol_table = None
+        xpr._symbol_table = None
         
         if err:
             evaluator = None
-            self.variables = [ ]
-            self._cnt = 0
-            self._cache = { }
-            self._evaluator_str = ''
-            self._evaluator = self.dummy_evaluator
+            xpr.variables = [ ]
+            xpr._cnt = 0
+            xpr._cache = { }
+            xpr._evaluator_str = ''
+            xpr._evaluator = xpr.dummy_evaluator
             print( 'Xpresion Error: ' + errmsg + ' at ' + expr )
         else:
             # make array
-            self.variables = list( self.variables.keys() )
-            self._evaluator_str = evaluator[0]
-            self._evaluator = evaluator[1]
+            xpr.variables = list( xpr.variables.keys() )
+            xpr._evaluator_str = evaluator[0]
+            xpr._evaluator = evaluator[1]
         
-        return self
+        return xpr
     
     def render(tok, args=None):
         if None==args: args=[]
@@ -1213,119 +1220,173 @@ class Xpresion:
     def t_tok(self, token): 
         return Tok(T_DFT, token, token)
 
-    def init( ):
+    def init( andConfigure=False ):
         if Xpresion._inited: return
+        Xpresion.OPERATORS = {}
+        Xpresion.FUNCTIONS = {}
+        Xpresion.Fn = Fn
+        Xpresion.RE = {}
+        Xpresion.BLOCKS = {}
+        Xpresion.Reserved = {}
+        Xpresion._inited = True
+        if True == andConfigure: Xpresion.defaultConfiguration( )
 
-        Xpresion.OPERATORS = {
-        #----------------------------------------------------------------------------------------
-        #symbol           input,    fixity,  associativity, priority, arity, output,     output_type
-        #------------------------------------------------------------------------------------------
-                      # bra-kets as n-ary operators
-         '('    :     Op(['(',')'], POSTFIX, RIGHT,          1,        1,    Tpl('$0'),   T_DUM )
-        ,')'    :     Op(')')
+    def defaultConfiguration( ):
+        if Xpresion._configured: return
 
-        ,'['    :     Op(['[',']'], POSTFIX, RIGHT,          2,        1,    Tpl('[$0]'), T_ARY )
-        ,']'    :     Op(']')
-
-        ,','    :     Op(',',       INFIX,   LEFT,           3,        2,    Tpl('$0,$1'), T_DFT )
-                      # n-ary (ternary) if-then-else operator
-        ,'?'    :     Op(['?',':'], INFIX,   RIGHT,        100,        3,    Tpl('($1 if $0 else $2)'), T_BOL )
-        ,':'    :     Op(':')
-
-        ,'!'    :     Op('!',       PREFIX,  RIGHT,         10,        1,    Tpl('(not $0)'), T_BOL )
-        ,'~'    :     Op('~',       PREFIX,  RIGHT,         10,        1,    Tpl('~$0'), T_NUM )
-
-        ,'^'    :     Op('^',       INFIX,   RIGHT,         11,        2,    Tpl('($0**$1)'), T_NUM )
-        ,'*'    :     Op('*',       INFIX,   LEFT,          20,        2,    Tpl('($0*$1)'), T_NUM ) 
-        ,'/'    :     Op('/',       INFIX,   LEFT,          20,        2,    Tpl('($0/$1)'), T_NUM )
-        ,'%'    :     Op('%',       INFIX,   LEFT,          20,        2,    Tpl('($0%$1)'), T_NUM )
-                      # addition/concatenation/unary plus as polymorphic operators
-        ,'+'    :     Op().Polymorphic([
-                      # array concatenation
-                      ["${TOK} and (not ${PREV_IS_OP}) and (${DEDUCED_TYPE}==${XPRESION}.T_ARY)",
-                      Op('+',       INFIX,   LEFT,          25,        2,    Tpl('Fn.ary_merge($0,$1)'), T_ARY )]
-                      # string concatenation
-                      ,["${TOK} and (not ${PREV_IS_OP}) and (${DEDUCED_TYPE}==${XPRESION}.T_STR)",
-                      Op('+',       INFIX,   LEFT,          25,        2,    Tpl('($0+str($1))'), T_STR )]
-                      # numeric addition
-                      ,["${TOK} and not ${PREV_IS_OP}",
-                      Op('+',       INFIX,   LEFT,          25,        2,    Tpl('($0+$1)'),  T_NUM )]
-                      # unary plus
-                      ,["not ${TOK} or ${PREV_IS_OP}",
-                      Op('+',       PREFIX,  RIGHT,          4,        1,    Tpl('$0'),  T_NUM )]
-                      ])
-
-        ,'-'    :     Op().Polymorphic([
-                      # numeric subtraction
-                      ["${TOK} and not ${PREV_IS_OP}",
-                      Op('-',       INFIX,   LEFT,          25,        2,    Tpl('($0-$1)'), T_NUM )]
-                      # unary negation
-                      ,["not ${TOK} or ${PREV_IS_OP}",
-                      Op('-',       PREFIX,  RIGHT,          4,        1,    Tpl('(-$0)'),  T_NUM )]
-                      ])
-
-        ,'>>'   :     Op('>>',      INFIX,   LEFT,          30,        2,    Tpl('($0>>$1)'), T_NUM )
-        ,'<<'   :     Op('<<',      INFIX,   LEFT,          30,        2,    Tpl('($0<<$1)'), T_NUM )
-
-        ,'>'    :     Op('>',       INFIX,   LEFT,          35,        2,    Tpl('($0>$1)'),  T_BOL )
-        ,'<'    :     Op('<',       INFIX,   LEFT,          35,        2,    Tpl('($0<$1)'),  T_BOL )
-        ,'>='   :     Op('>=',      INFIX,   LEFT,          35,        2,    Tpl('($0>=$1)'), T_BOL )
-        ,'<='   :     Op('<=',      INFIX,   LEFT,          35,        2,    Tpl('($0<=$1)'), T_BOL )
-
-        ,'=='   :     Op().Polymorphic([
-                      # array equivalence
-                      ["${DEDUCED_TYPE}==${XPRESION}.T_ARY",
-                      Op('==',      INFIX,   LEFT,          40,        2,    Tpl('Fn.ary_eq($0,$1)'), T_BOL )]
-                      # default equivalence
-                      ,["True",
-                      Op('==',      INFIX,   LEFT,          40,        2,    Tpl('($0==$1)'), T_BOL )]
-                      ])
-
-        ,'!='   :     Op('!=',      INFIX,   LEFT,          40,        2,    Tpl('($0!=$1)'), T_BOL )
-
-        ,'matches' :  Op('matches', INFIX,   NONE,          40,        2,    Tpl('bool($0.match($1))'), T_BOL )
-        ,'in'   :     Op('in',      INFIX,   NONE,          40,        2,    Tpl('($0 in $1)'), T_BOL )
-        ,'has'     :  Op('has',     INFIX,   NONE,          40,        2,    Tpl('($1 in $0)'), T_BOL )
-
-        ,'&'    :     Op('&',       INFIX,   LEFT,          45,        2,    Tpl('($0&$1)'),  T_NUM )
-        ,'|'    :     Op('|',       INFIX,   LEFT,          46,        2,    Tpl('($0|$1)'),  T_NUM )
-
-        ,'&&'   :     Op('&&',      INFIX,   LEFT,          47,        2,    Tpl('($0 and $1)'), T_BOL )
-        ,'||'   :     Op('||',      INFIX,   LEFT,          48,        2,    Tpl('($0 or $1)'), T_BOL )
-         
+        Xpresion.defOp({
+        #-------------------------------------------------------------------------------------------------
+        # symbol     input       ,fixity     ,associativity  ,priority   ,arity  ,output     ,output_type
+        #--------------------------------------------------------------------------------------------------
+                    # bra-kets as n-ary operators
+         '('    :   Op(
+                    ['(',')']   ,POSTFIX    ,RIGHT          ,1          ,1      ,'$0'       ,T_DUM 
+                    )
+        ,')'    :   Op(')')
+        ,'['    :   Op(
+                    ['[',']']   ,POSTFIX    ,RIGHT          ,2          ,1      ,'[$0]'     ,T_ARY 
+                    )
+        ,']'    :   Op(']')
+        ,','    :   Op(
+                    ','         ,INFIX      ,LEFT           ,3          ,2      ,'$0,$1'    ,T_DFT 
+                    )
+                    # n-ary (ternary) if-then-else operator
+        ,'?'    :   Op(
+                    ['?',':']   ,INFIX      ,RIGHT          ,100        ,3      ,'($1 if $0 else $2)'   ,T_BOL 
+                    )
+        ,':'    :   Op(':')
+        
+        ,'!'    :   Op(
+                    '!'         ,PREFIX     ,RIGHT          ,10         ,1      ,'(not $0)' ,T_BOL 
+                    )
+        ,'~'    :   Op(
+                    '~'         ,PREFIX     ,RIGHT          ,10         ,1      ,'~$0'      ,T_NUM 
+                    )
+        ,'^'    :   Op(
+                    '^'         ,INFIX      ,RIGHT          ,11         ,2      ,'($0**$1)' ,T_NUM 
+                    )
+        ,'*'    :   Op(
+                    '*'         ,INFIX      ,LEFT           ,20         ,2      ,'($0*$1)'  ,T_NUM 
+                    ) 
+        ,'/'    :   Op(
+                    '/'         ,INFIX      ,LEFT           ,20         ,2      ,'($0/$1)'  ,T_NUM 
+                    )
+        ,'%'    :   Op(
+                    '%'         ,INFIX      ,LEFT           ,20         ,2      ,'($0%$1)'  ,T_NUM 
+                    )
+                    # addition/concatenation/unary plus as polymorphic operators
+        ,'+'    :   Op().Polymorphic([
+                    # array concatenation
+                    ["${TOK} and (not ${PREV_IS_OP}) and (${DEDUCED_TYPE}==Xpresion.T_ARY)", Op(
+                    '+'         ,INFIX      ,LEFT           ,25         ,2      ,'Fn.ary_merge($0,$1)'  ,T_ARY 
+                    )]
+                    # string concatenation
+                    ,["${TOK} and (not ${PREV_IS_OP}) and (${DEDUCED_TYPE}==Xpresion.T_STR)", Op(
+                    '+'         ,INFIX      ,LEFT           ,25         ,2      ,'($0+str($1))' ,T_STR 
+                    )]
+                    # numeric addition
+                    ,["${TOK} and not ${PREV_IS_OP}", Op(
+                    '+'         ,INFIX      ,LEFT           ,25         ,2      ,'($0+$1)'  ,T_NUM 
+                    )]
+                    # unary plus
+                    ,["(not ${TOK}) or ${PREV_IS_OP}", Op(
+                    '+'         ,PREFIX     ,RIGHT          ,4          ,1      ,'$0'       ,T_NUM 
+                    )]
+                    ])
+        ,'-'    :   Op().Polymorphic([
+                    # numeric subtraction
+                    ["${TOK} and not ${PREV_IS_OP}", Op(
+                    '-'         ,INFIX      ,LEFT           ,25         ,2      ,'($0-$1)'  ,T_NUM 
+                    )]
+                    # unary negation
+                    ,["(not ${TOK}) or ${PREV_IS_OP}", Op(
+                    '-'         ,PREFIX     ,RIGHT          ,4          ,1      ,'(-$0)'        ,T_NUM 
+                    )]
+                    ])
+        ,'>>'   :   Op(
+                    '>>'        ,INFIX      ,LEFT           ,30         ,2      ,'($0>>$1)'     ,T_NUM 
+                    )
+        ,'<<'   :   Op(
+                    '<<'        ,INFIX      ,LEFT           ,30         ,2      ,'($0<<$1)'     ,T_NUM 
+                    )
+        ,'>'    :   Op(
+                    '>'         ,INFIX      ,LEFT           ,35         ,2      ,'($0>$1)'      ,T_BOL 
+                    )
+        ,'<'    :   Op(
+                    '<'         ,INFIX      ,LEFT           ,35         ,2      ,'($0<$1)'      ,T_BOL 
+                    )
+        ,'>='   :   Op(
+                    '>='        ,INFIX      ,LEFT           ,35         ,2      ,'($0>=$1)'     ,T_BOL 
+                    )
+        ,'<='   :   Op(
+                    '<='        ,INFIX      ,LEFT           ,35         ,2      ,'($0<=$1)'     ,T_BOL 
+                    )
+        ,'=='   :   Op().Polymorphic([
+                    # array equivalence
+                    ["${DEDUCED_TYPE}==Xpresion.T_ARY", Op(
+                    '=='        ,INFIX      ,LEFT           ,40         ,2      ,'Fn.ary_eq($0,$1)' ,T_BOL 
+                    )]
+                    # default equivalence
+                    ,["True", Op(
+                    '=='        ,INFIX      ,LEFT           ,40         ,2      ,'($0==$1)'     ,T_BOL 
+                    )]
+                    ])
+        ,'!='   :   Op(
+                    '!='        ,INFIX      ,LEFT           ,40         ,2      ,'($0!=$1)'     ,T_BOL 
+                    )
+        ,'matches': Op(
+                    'matches'   ,INFIX      ,NONE           ,40         ,2      ,'Fn.match($1,$0)'  ,T_BOL 
+                    )
+        ,'in'   :   Op(
+                    'in'        ,INFIX      ,NONE           ,40         ,2      ,'($0 in $1)'   ,T_BOL 
+                    )
+        ,'has'  :   Op(
+                    'has'       ,INFIX      ,NONE           ,40         ,2      ,'($1 in $0)'   ,T_BOL 
+                    )
+        ,'&'    :   Op(
+                    '&'         ,INFIX      ,LEFT           ,45         ,2      ,'($0&$1)'      ,T_NUM 
+                    )
+        ,'|'    :   Op(
+                    '|'         ,INFIX      ,LEFT           ,46         ,2      ,'($0|$1)'      ,T_NUM 
+                    )
+        ,'&&'   :   Op(
+                    '&&'        ,INFIX      ,LEFT           ,47         ,2      ,'($0 and $1)'  ,T_BOL 
+                    )
+        ,'||'   :   Op(
+                    '||'        ,INFIX      ,LEFT           ,48         ,2      ,'($0 or $1)'   ,T_BOL 
+                    )
         #------------------------------------------
         #                aliases
         #-------------------------------------------
-        ,'or'    :    Alias( '||' )
-        ,'and'   :    Alias( '&&' )
-        ,'not'   :    Alias( '!' )
-        }
+        ,'or'    :  Alias( '||' )
+        ,'and'   :  Alias( '&&' )
+        ,'not'   :  Alias( '!' )
+        })
 
-        Xpresion.FUNCTIONS = {
-        #-----------------------------------------------------------------------
-        #symbol              input,    output,          output_type,priority
-        #-------------------------------------------------------------------------
-         'min'      : Func('min',   Tpl('min($0)'),  T_NUM,   5  )
-        ,'max'      : Func('max',   Tpl('max($0)'),  T_NUM,   5  )
-        ,'pow'      : Func('pow',   Tpl('Fn.pow($0)'),  T_NUM,   5  )
-        ,'sqrt'     : Func('sqrt',  Tpl('math.sqrt($0)'), T_NUM,   5  )
-        ,'len'      : Func('len',   Tpl('Fn.len($0)'),    T_NUM,   5  )
-        ,'int'      : Func('int',   Tpl('int($0)'),  T_NUM,   5  )
-        ,'str'      : Func('str',   Tpl('str($0)'),  T_STR,   5  )
-        #,'iif'      : Func('iif',   Tpl('Fn.iif($0)'),    T_BOL,   5  )
-        ,'clamp'    : Func('clamp', Tpl('Fn.clamp($0)'),  T_NUM,   5  )
-        ,'sum'      : Func('sum',   Tpl('Fn.sum($0)'),    T_NUM,   5  )
-        ,'avg'      : Func('avg',   Tpl('Fn.avg($0)'),    T_NUM,   5  )
+        Xpresion.defFunc({
+        #------------------------------------------------------------------------------------
+        #symbol              input   ,output             ,output_type    ,priority(default 5)
+        #------------------------------------------------------------------------------------
+         'min'      : Func('min'    ,'min($0)'          ,T_NUM  )
+        ,'max'      : Func('max'    ,'max($0)'          ,T_NUM  )
+        ,'pow'      : Func('pow'    ,'Fn.pow($0)'       ,T_NUM  )
+        ,'sqrt'     : Func('sqrt'   ,'math.sqrt($0)'    ,T_NUM  )
+        ,'len'      : Func('len'    ,'Fn.len($0)'       ,T_NUM  )
+        ,'int'      : Func('int'    ,'int($0)'          ,T_NUM  )
+        ,'str'      : Func('str'    ,'str($0)'          ,T_STR  )
+        ,'clamp'    : Func('clamp'  ,'Fn.clamp($0)'     ,T_NUM  )
+        ,'sum'      : Func('sum'    ,'Fn.sum($0)'       ,T_NUM  )
+        ,'avg'      : Func('avg'    ,'Fn.avg($0)'       ,T_NUM  )
         #---------------------------------------
         #                aliases
         #----------------------------------------
          # ...
-        }
+        })
 
         # function implementations (can also be overriden per instance/evaluation call)
-        Xpresion.Fn = Fn
+        #Xpresion.Fn = Fn
 
-        Xpresion.RE = {
+        Xpresion.defRE({
         #-----------------------------------------------
         #token                re
         #-------------------------------------------------
@@ -1335,9 +1396,9 @@ class Xpresion:
         ,'t_num'        :  re.compile(r'^(\d+(\.\d+)?)')
         ,'t_ident'      :  re.compile(r'^([a-zA-Z_][a-zA-Z0-9_]*)\b')
         ,'t_var'        :  re.compile(r'^\$([a-zA-Z0-9_][a-zA-Z0-9_.]*)\b')
-        }
+        })
 
-        Xpresion.BLOCKS = {
+        Xpresion.defBlock({
          '\'': {
             'type': T_STR, 
             'parse': Xpresion.parse_delimited_block
@@ -1358,20 +1419,20 @@ class Xpresion:
         #        return rest;
         #    }
         #}
-        }
+        })
 
-        Xpresion.Reserved = {
+        Xpresion.defReserved({
          'null'     : Tok(T_IDE, 'null', 'None')
         ,'false'    : Tok(T_BOL, 'false', 'False')
         ,'true'     : Tok(T_BOL, 'true', 'True')
-        ,'infinity' : Tok(T_NUM, 'Infinity', 'float("inf")')
-        ,'nan'      : Tok(T_NUM, 'NaN', 'float("nan")')
+        ,'infinity' : Tok(T_NUM, 'Infinity', 'Fn.INF')
+        ,'nan'      : Tok(T_NUM, 'NaN', 'Fn.NAN')
         # aliases
         ,'none'     : Alias('null')
-        ,'inf'      : Alias('inf')
-        }
+        ,'inf'      : Alias('infinity')
+        })
 
-        Xpresion._inited = True
+        Xpresion._configured = True
     
 Xpresion.init( )
 

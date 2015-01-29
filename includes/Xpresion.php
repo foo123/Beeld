@@ -3,7 +3,7 @@
 *
 *   Xpresion
 *   Simple eXpression parser engine with variables and custom functions support for PHP, Python, Node/JS, ActionScript
-*   @version: 0.5
+*   @version: 0.5.1
 *
 *   https://github.com/foo123/Xpresion
 *
@@ -331,6 +331,8 @@ class XpresionAlias
             while (($entry instanceof XpresionAlias) && (isset($entries[$entry->alias])))
             {
                 $id = $entry->alias;
+                // circular reference
+                if ($entry === $entries[ $id ]) return false;
                 $entry = $entries[ $id ];
             }
             return $entry;
@@ -477,13 +479,15 @@ class XpresionOp extends XpresionTok
             $this->type = Xpresion::T_OP;
         }
         
+        if ( !($output instanceof XpresionTpl) ) $output = new XpresionTpl($output);
+        
         parent::__construct($this->type, $this->parts[0], $output);
         
         $this->fixity = null !== $fixity ? $fixity : Xpresion::PREFIX;
         $this->associativity = null !== $associativity ? $associativity : Xpresion::DEFAUL;
         $this->priority = $priority;
         $this->arity = $arity;
-        $this->otype = $otype;
+        $this->otype = null !== $otype ? $otype : Xpresion::T_DFT;
         $this->ofixity = null !== $ofixity ? $ofixity : $this->fixity;
         $this->parenthesize = false;
         $this->revert = false;
@@ -621,6 +625,9 @@ class XpresionFn
 {
     public $Fn = array();
     
+    public $INF = INF;
+    public $NAN = NAN;
+    
     public function __call($fn, $args)
     {
         if ( $fn && isset($this->Fn[$fn]) && is_callable($this->Fn[$fn]) )
@@ -693,7 +700,7 @@ class XpresionFn
 
 class Xpresion
 {
-    const VERSION = "0.5";
+    const VERSION = "0.5.1";
     
     const COMMA       =   ',';
     const LPAREN      =   '(';
@@ -724,6 +731,7 @@ class Xpresion
     const T_FUN       =   131;
     
     public static $_inited = false;
+    public static $_configured = false;
     
     public static $OPERATORS_S = null;
     public static $FUNCTIONS_S = null;
@@ -1369,119 +1377,176 @@ class Xpresion
         return new Xpresion($expr);
     }
     
-    public static function init( )
+    public static function init( $andConfigure=false )
     {
-    if (self::$_inited) return;
+        if (self::$_inited) return;
+        Xpresion::$OPERATORS_S = array();
+        Xpresion::$FUNCTIONS_S = array();
+        Xpresion::$Fn_S = new XpresionFn();
+        Xpresion::$RE_S = array();
+        Xpresion::$BLOCKS_S = array();
+        Xpresion::$Reserved_S = array();
+        XpresionUtils::$dummy = create_function('$Var,$Fn,$Cache', 'return null;');
+        self::$_inited = true;
+        if ( true === $andConfigure ) Xpresion::defaultConfiguration( );
+    }
 
-    Xpresion::$OPERATORS_S = array(
-    //------------------------------------------------------------------------------------------------------------------------------
-    //symbol                    input,             fixity,           associativity,         priority, arity, output,     output_type
-    //------------------------------------------------------------------------------------------------------------------------------
-                   // bra-kets as n-ary operators
-     '('    =>     Xpresion::Op(array('(',')'), Xpresion::POSTFIX, Xpresion::RIGHT,          1,        1,    Xpresion::Tpl('$0'),   Xpresion::T_DUM )
-    ,')'    =>     Xpresion::Op(')')
-            
-    ,'['    =>     Xpresion::Op(array('[',']'), Xpresion::POSTFIX, Xpresion::RIGHT,          2,        1,    Xpresion::Tpl('array($0)'), Xpresion::T_ARY )
-    ,']'    =>     Xpresion::Op(']')
-            
-    ,','    =>     Xpresion::Op(',',       Xpresion::INFIX,   Xpresion::LEFT,           3,        2,    Xpresion::Tpl('$0,$1'), Xpresion::T_DFT )
-                   // n-ary (ternary) if-then-else operator
-    ,'?'    =>     Xpresion::Op(array('?',':'), Xpresion::INFIX,   Xpresion::RIGHT,     100,        3,    Xpresion::Tpl('($0?$1:$2)'), Xpresion::T_BOL )
-    ,':'    =>     Xpresion::Op(':')
-            
-    ,'!'    =>     Xpresion::Op('!',       Xpresion::PREFIX,  Xpresion::RIGHT,         10,        1,    Xpresion::Tpl('!$0'), Xpresion::T_BOL )
-    ,'~'    =>     Xpresion::Op('~',       Xpresion::PREFIX,  Xpresion::RIGHT,         10,        1,    Xpresion::Tpl('~$0'), Xpresion::T_NUM )
-            
-    ,'^'    =>     Xpresion::Op('^',       Xpresion::INFIX,   Xpresion::RIGHT,         11,        2,    Xpresion::Tpl('pow($0,$1)'), Xpresion::T_NUM, Xpresion::PREFIX )
-    ,'*'    =>     Xpresion::Op('*',       Xpresion::INFIX,   Xpresion::LEFT,          20,        2,    Xpresion::Tpl('($0*$1)'), Xpresion::T_NUM ) 
-    ,'/'    =>     Xpresion::Op('/',       Xpresion::INFIX,   Xpresion::LEFT,          20,        2,    Xpresion::Tpl('($0/$1)'), Xpresion::T_NUM )
-    ,'%'    =>     Xpresion::Op('%',       Xpresion::INFIX,   Xpresion::LEFT,          20,        2,    Xpresion::Tpl('($0%$1)'), Xpresion::T_NUM )
-                   // addition/concatenation/unary plus as polymorphic operators
-    ,'+'    =>     Xpresion::Op()->Polymorphic(array(
-                   // array concatenation
-                   array('${TOK} and (!${PREV_IS_OP}) and (${DEDUCED_TYPE}===Xpresion::T_ARY)',
-                   Xpresion::Op('+',       Xpresion::INFIX,   Xpresion::LEFT,          25,        2,    Xpresion::Tpl('$Fn->ary_merge($0,$1)'), Xpresion::T_ARY ))
-                   // string concatenation
-                   ,array('${TOK} and (!${PREV_IS_OP}) and (${DEDUCED_TYPE}===Xpresion::T_STR)',
-                   Xpresion::Op('+',       Xpresion::INFIX,   Xpresion::LEFT,          25,        2,    Xpresion::Tpl('($0.strval($1))'), Xpresion::T_STR ))
-                   // numeric addition
-                   ,array('${TOK} and (!${PREV_IS_OP})',
-                   Xpresion::Op('+',       Xpresion::INFIX,   Xpresion::LEFT,          25,        2,    Xpresion::Tpl('($0+$1)'),  Xpresion::T_NUM ))
-                   // unary plus
-                   ,array('!${TOK} or ${PREV_IS_OP}',
-                   Xpresion::Op('+',       Xpresion::PREFIX,  Xpresion::RIGHT,          4,        1,    Xpresion::Tpl('$0'),  Xpresion::T_NUM ))
-                   ))
-            
-    ,'-'    =>     Xpresion::Op()->Polymorphic(array(
-                   // numeric subtraction
-                   array('${TOK} and (!${PREV_IS_OP})',
-                   Xpresion::Op('-',       Xpresion::INFIX,   Xpresion::LEFT,          25,        2,    Xpresion::Tpl('($0-$1)'), Xpresion::T_NUM ))
-                   // unary negation
-                   ,array('!${TOK} or ${PREV_IS_OP}',
-                   Xpresion::Op('-',       Xpresion::PREFIX,  Xpresion::RIGHT,          4,        1,    Xpresion::Tpl('(-$0)'),  Xpresion::T_NUM ))
-                   ))
-            
-    ,'>>'   =>     Xpresion::Op('>>',      Xpresion::INFIX,   Xpresion::LEFT,          30,        2,    Xpresion::Tpl('($0>>$1)'), Xpresion::T_NUM )
-    ,'<<'   =>     Xpresion::Op('<<',      Xpresion::INFIX,   Xpresion::LEFT,          30,        2,    Xpresion::Tpl('($0<<$1)'), Xpresion::T_NUM )
-            
-    ,'>'    =>     Xpresion::Op('>',       Xpresion::INFIX,   Xpresion::LEFT,          35,        2,    Xpresion::Tpl('($0>$1)'),  Xpresion::T_BOL )
-    ,'<'    =>     Xpresion::Op('<',       Xpresion::INFIX,   Xpresion::LEFT,          35,        2,    Xpresion::Tpl('($0<$1)'),  Xpresion::T_BOL )
-    ,'>='   =>     Xpresion::Op('>=',      Xpresion::INFIX,   Xpresion::LEFT,          35,        2,    Xpresion::Tpl('($0>=$1)'), Xpresion::T_BOL )
-    ,'<='   =>     Xpresion::Op('<=',      Xpresion::INFIX,   Xpresion::LEFT,          35,        2,    Xpresion::Tpl('($0<=$1)'), Xpresion::T_BOL )
-            
-    ,'=='   =>     Xpresion::Op()->Polymorphic(array(
-                   // array equivalence
-                   array('${DEDUCED_TYPE}===Xpresion::T_ARY',
-                   Xpresion::Op('==',      Xpresion::INFIX,   Xpresion::LEFT,          40,        2,    Xpresion::Tpl('$Fn->ary_eq($0,$1)'), Xpresion::T_BOL ))
-                   // default equivalence
-                   ,array('true',
-                   Xpresion::Op('==',      Xpresion::INFIX,   Xpresion::LEFT,          40,        2,    Xpresion::Tpl('($0==$1)'), Xpresion::T_BOL ))
-                   ))
-            
-    ,'!='   =>     Xpresion::Op('!=',      Xpresion::INFIX,   Xpresion::LEFT,          40,        2,    Xpresion::Tpl('($0!=$1)'), Xpresion::T_BOL )
+    public static function defaultConfiguration( )
+    {
+    if (self::$_configured) return;
 
-    ,'matches' =>  Xpresion::Op('matches', Xpresion::INFIX,   Xpresion::NONE,          40,        2,    Xpresion::Tpl('$Fn->match($1,$0)'), Xpresion::T_BOL )
-    ,'in'   =>     Xpresion::Op('in',      Xpresion::INFIX,   Xpresion::NONE,          40,        2,    Xpresion::Tpl('in_array($0,$1)'), Xpresion::T_BOL )
-    ,'has'     =>  Xpresion::Op('has',     Xpresion::INFIX,   Xpresion::NONE,          40,        2,    Xpresion::Tpl('in_array($1,$0)'), Xpresion::T_BOL )
-
-    ,'&'    =>     Xpresion::Op('&',       Xpresion::INFIX,   Xpresion::LEFT,          45,        2,    Xpresion::Tpl('($0&$1)'),  Xpresion::T_NUM )
-    ,'|'    =>     Xpresion::Op('|',       Xpresion::INFIX,   Xpresion::LEFT,          46,        2,    Xpresion::Tpl('($0|$1)'),  Xpresion::T_NUM )
-
-    ,'&&'   =>     Xpresion::Op('&&',      Xpresion::INFIX,   Xpresion::LEFT,          47,        2,    Xpresion::Tpl('($0&&$1)'), Xpresion::T_BOL )
-    ,'||'   =>     Xpresion::Op('||',      Xpresion::INFIX,   Xpresion::LEFT,          48,        2,    Xpresion::Tpl('($0||$1)'), Xpresion::T_BOL )
-     
+    Xpresion::defOp(array(
+    //------------------------------------------------------------------------------------------------------------------------
+    //symbol    input               ,fixity                 ,associativity      ,priority   ,arity  ,output         ,output_type
+    //------------------------------------------------------------------------------------------------------------------------
+                // bra-kets as n-ary operators
+     '('    =>  Xpresion::Op(
+                array('(',')')      ,Xpresion::POSTFIX      ,Xpresion::RIGHT    ,1          ,1      ,'$0'           ,Xpresion::T_DUM 
+                )
+    ,')'    =>  Xpresion::Op(')')
+    ,'['    =>  Xpresion::Op(
+                array('[',']')      ,Xpresion::POSTFIX      ,Xpresion::RIGHT    ,2          ,1      ,'array($0)'    ,Xpresion::T_ARY 
+                )
+    ,']'    =>  Xpresion::Op(']')
+    ,','    =>  Xpresion::Op(
+                ','                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,3          ,2      ,'$0,$1'        ,Xpresion::T_DFT 
+                )
+               // n-ary (ternary) if-then-else operator
+    ,'?'    =>  Xpresion::Op(
+                array('?',':')      ,Xpresion::INFIX        ,Xpresion::RIGHT    ,100        ,3      ,'($0?$1:$2)'   ,Xpresion::T_BOL 
+                )
+    ,':'    =>  Xpresion::Op(':')
+    ,'!'    =>  Xpresion::Op(
+                '!'                 ,Xpresion::PREFIX       ,Xpresion::RIGHT    ,10         ,1      ,'!$0'          ,Xpresion::T_BOL 
+                )
+    ,'~'    =>  Xpresion::Op(
+                '~'                 ,Xpresion::PREFIX       ,Xpresion::RIGHT    ,10         ,1      ,'~$0'          ,Xpresion::T_NUM 
+                )
+    ,'^'    =>  Xpresion::Op(
+                '^'                 ,Xpresion::INFIX        ,Xpresion::RIGHT    ,11         ,2      ,'pow($0,$1)'   ,Xpresion::T_NUM 
+                )
+    ,'*'    =>  Xpresion::Op(
+                '*'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,20         ,2      ,'($0*$1)'      ,Xpresion::T_NUM 
+                ) 
+    ,'/'    =>  Xpresion::Op(
+                '/'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,20         ,2      ,'($0/$1)'      ,Xpresion::T_NUM 
+                )
+    ,'%'    =>  Xpresion::Op(
+                '%'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,20         ,2      ,'($0%$1)'      ,Xpresion::T_NUM 
+                )
+                // addition/concatenation/unary plus as polymorphic operators
+    ,'+'    =>  Xpresion::Op()->Polymorphic(array(
+                // array concatenation
+                array('${TOK} and (!${PREV_IS_OP}) and (${DEDUCED_TYPE}===Xpresion::T_ARY)', Xpresion::Op(
+                '+'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,25         ,2      ,'$Fn->ary_merge($0,$1)'    ,Xpresion::T_ARY 
+                ))
+                // string concatenation
+                ,array('${TOK} and (!${PREV_IS_OP}) and (${DEDUCED_TYPE}===Xpresion::T_STR)', Xpresion::Op(
+                '+'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,25         ,2      ,'($0.strval($1))'  ,Xpresion::T_STR 
+                ))
+                // numeric addition
+                ,array('${TOK} and (!${PREV_IS_OP})', Xpresion::Op(
+                '+'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,25         ,2      ,'($0+$1)'      ,Xpresion::T_NUM 
+                ))
+                // unary plus
+                ,array('!${TOK} or ${PREV_IS_OP}', Xpresion::Op(
+                '+'                 ,Xpresion::PREFIX       ,Xpresion::RIGHT    ,4          ,1      ,'$0'           ,Xpresion::T_NUM 
+                ))
+                ))
+    ,'-'    =>  Xpresion::Op()->Polymorphic(array(
+                // numeric subtraction
+                array('${TOK} and (!${PREV_IS_OP})', Xpresion::Op(
+                '-'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,25         ,2      ,'($0-$1)'      ,Xpresion::T_NUM 
+                ))
+                // unary negation
+                ,array('!${TOK} or ${PREV_IS_OP}', Xpresion::Op(
+                '-'                 ,Xpresion::PREFIX       ,Xpresion::RIGHT    ,4          ,1      ,'(-$0)'        ,Xpresion::T_NUM 
+                ))
+                ))
+    ,'>>'   =>  Xpresion::Op(
+                '>>'                ,Xpresion::INFIX        ,Xpresion::LEFT     ,30         ,2      ,'($0>>$1)'     ,Xpresion::T_NUM 
+                )
+    ,'<<'   =>  Xpresion::Op(
+                '<<'                ,Xpresion::INFIX        ,Xpresion::LEFT     ,30         ,2      ,'($0<<$1)'     ,Xpresion::T_NUM 
+                )
+    ,'>'    =>  Xpresion::Op(
+                '>'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,35         ,2      ,'($0>$1)'      ,Xpresion::T_BOL 
+                )
+    ,'<'    =>  Xpresion::Op(
+                '<'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,35         ,2      ,'($0<$1)'      ,Xpresion::T_BOL 
+                )
+    ,'>='   =>  Xpresion::Op(
+                '>='                ,Xpresion::INFIX        ,Xpresion::LEFT     ,35         ,2      ,'($0>=$1)'     ,Xpresion::T_BOL 
+                )
+    ,'<='   =>  Xpresion::Op(
+                '<='                ,Xpresion::INFIX        ,Xpresion::LEFT     ,35         ,2      ,'($0<=$1)'     ,Xpresion::T_BOL 
+                )
+    ,'=='   =>  Xpresion::Op()->Polymorphic(array(
+                // array equivalence
+                array('${DEDUCED_TYPE}===Xpresion::T_ARY', Xpresion::Op(
+                '=='                ,Xpresion::INFIX        ,Xpresion::LEFT     ,40         ,2      ,'$Fn->ary_eq($0,$1)'   ,Xpresion::T_BOL 
+                ))
+                // default equivalence
+                ,array('true', Xpresion::Op(
+                '=='                ,Xpresion::INFIX        ,Xpresion::LEFT     ,40         ,2      ,'($0==$1)'     ,Xpresion::T_BOL 
+                ))
+                ))
+    ,'!='   =>  Xpresion::Op(
+                '!='                ,Xpresion::INFIX        ,Xpresion::LEFT     ,40         ,2      ,'($0!=$1)'     ,Xpresion::T_BOL 
+                )
+    ,'matches'=>Xpresion::Op(
+                'matches'           ,Xpresion::INFIX        ,Xpresion::NONE     ,40         ,2      ,'$Fn->match($1,$0)'    ,Xpresion::T_BOL 
+                )
+    ,'in'   =>  Xpresion::Op(
+                'in'                ,Xpresion::INFIX        ,Xpresion::NONE     ,40         ,2      ,'in_array($0,$1)'      ,Xpresion::T_BOL 
+                )
+    ,'has'  =>  Xpresion::Op(
+                'has'               ,Xpresion::INFIX        ,Xpresion::NONE     ,40         ,2      ,'in_array($1,$0)'      ,Xpresion::T_BOL 
+                )
+    ,'&'    =>  Xpresion::Op(
+                '&'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,45         ,2      ,'($0&$1)'      ,Xpresion::T_NUM 
+                )
+    ,'|'    =>  Xpresion::Op(
+                '|'                 ,Xpresion::INFIX        ,Xpresion::LEFT     ,46         ,2      ,'($0|$1)'      ,Xpresion::T_NUM 
+                )
+    ,'&&'   =>  Xpresion::Op(
+                '&&'                ,Xpresion::INFIX        ,Xpresion::LEFT     ,47         ,2      ,'($0&&$1)'     ,Xpresion::T_BOL 
+                )
+    ,'||'   =>  Xpresion::Op(
+                '||'                ,Xpresion::INFIX        ,Xpresion::LEFT     ,48         ,2      ,'($0||$1)'     ,Xpresion::T_BOL 
+                )
     //------------------------------------------
     //                aliases
     //-------------------------------------------
-    ,'or'    =>    Xpresion::Alias( '||' )
-    ,'and'   =>    Xpresion::Alias( '&&' )
-    ,'not'   =>    Xpresion::Alias( '!' )
-    );
+    ,'or'   =>  Xpresion::Alias( '||' )
+    ,'and'  =>  Xpresion::Alias( '&&' )
+    ,'not'  =>  Xpresion::Alias( '!' )
+    ));
 
-    Xpresion::$FUNCTIONS_S = array(
-    //-----------------------------------------------------------------------
-    //symbol              input,                     output,          output_type,priority
-    //-------------------------------------------------------------------------
-     'min'      => Xpresion::Func('min',   Xpresion::Tpl('min($0)'),  Xpresion::T_NUM,   5  )
-    ,'max'      => Xpresion::Func('max',   Xpresion::Tpl('max($0)'),  Xpresion::T_NUM,   5  )
-    ,'pow'      => Xpresion::Func('pow',   Xpresion::Tpl('pow($0)'),  Xpresion::T_NUM,   5  )
-    ,'sqrt'     => Xpresion::Func('sqrt',  Xpresion::Tpl('sqrt($0)'), Xpresion::T_NUM,   5  )
-    ,'len'      => Xpresion::Func('len',   Xpresion::Tpl('$Fn->len($0)'),    Xpresion::T_NUM,   5  )
-    ,'int'      => Xpresion::Func('int',   Xpresion::Tpl('intval($0)'),  Xpresion::T_NUM,   5  )
-    ,'str'      => Xpresion::Func('str',   Xpresion::Tpl('strval($0)'),  Xpresion::T_STR,   5  )
-    ,'clamp'    => Xpresion::Func('clamp', Xpresion::Tpl('$Fn->clamp($0)'),  Xpresion::T_NUM,   5  )
-    ,'sum'      => Xpresion::Func('sum',   Xpresion::Tpl('$Fn->sum($0)'),    Xpresion::T_NUM,   5  )
-    ,'avg'      => Xpresion::Func('avg',   Xpresion::Tpl('$Fn->avg($0)'),    Xpresion::T_NUM,   5  )
+    Xpresion::defFunc(array(
+    //-------------------------------------------------------------------------------------------
+    //symbol                    input       ,output             ,output_type    ,priority(default 5)
+    //-------------------------------------------------------------------------------------------
+     'min'      => Xpresion::Func('min'     ,'min($0)'          ,Xpresion::T_NUM  )
+    ,'max'      => Xpresion::Func('max'     ,'max($0)'          ,Xpresion::T_NUM  )
+    ,'pow'      => Xpresion::Func('pow'     ,'pow($0)'          ,Xpresion::T_NUM  )
+    ,'sqrt'     => Xpresion::Func('sqrt'    ,'sqrt($0)'         ,Xpresion::T_NUM  )
+    ,'len'      => Xpresion::Func('len'     ,'$Fn->len($0)'     ,Xpresion::T_NUM  )
+    ,'int'      => Xpresion::Func('int'     ,'intval($0)'       ,Xpresion::T_NUM  )
+    ,'str'      => Xpresion::Func('str'     ,'strval($0)'       ,Xpresion::T_STR  )
+    ,'clamp'    => Xpresion::Func('clamp'   ,'$Fn->clamp($0)'   ,Xpresion::T_NUM  )
+    ,'sum'      => Xpresion::Func('sum'     ,'$Fn->sum($0)'     ,Xpresion::T_NUM  )
+    ,'avg'      => Xpresion::Func('avg'     ,'$Fn->avg($0)'     ,Xpresion::T_NUM  )
     //---------------------------------------
     //                aliases
     //----------------------------------------
      // ...
-    );
+    ));
 
     // function implementations (can also be overriden per instance/evaluation call)
-    Xpresion::$Fn_S = new XpresionFn();
+    //Xpresion::$Fn_S = new XpresionFn();
 
-    Xpresion::$RE_S = array(
+    Xpresion::defRE(array(
     //-----------------------------------------------
     //token                re
     //-------------------------------------------------
@@ -1491,9 +1556,9 @@ class Xpresion
     ,'t_num'        =>  '/^(\\d+(\\.\\d+)?)/'
     ,'t_ident'      =>  '/^([a-zA-Z_][a-zA-Z0-9_]*)\\b/'
     ,'t_var'        =>  '/^\\$([a-zA-Z0-9_][a-zA-Z0-9_.]*)\\b/'
-    );
+    ));
 
-    Xpresion::$BLOCKS_S = array(
+    Xpresion::defBlock(array(
      '\''=> array(
         'type'=> Xpresion::T_STR, 
         'parse'=> array('Xpresion','parse_delimited_block')
@@ -1514,22 +1579,20 @@ class Xpresion
             return rest;
         }
     }*/
-    );
+    ));
 
-    Xpresion::$Reserved_S = array(
+    Xpresion::defReserved(array(
      'null'     => Xpresion::Tok(Xpresion::T_IDE, 'null', 'null')
     ,'false'    => Xpresion::Tok(Xpresion::T_BOL, 'false', 'false')
     ,'true'     => Xpresion::Tok(Xpresion::T_BOL, 'true', 'true')
-    ,'infinity' => Xpresion::Tok(Xpresion::T_NUM, 'Infinity', 'INF')
-    ,'nan'      => Xpresion::Tok(Xpresion::T_NUM, 'NaN', 'NAN')
+    ,'infinity' => Xpresion::Tok(Xpresion::T_NUM, 'Infinity', '$Fn->INF')
+    ,'nan'      => Xpresion::Tok(Xpresion::T_NUM, 'NaN', '$Fn->NAN')
     // aliases
     ,'none'     => Xpresion::Alias('null')
-    ,'inf'      => Xpresion::Alias('inf')
-    );
+    ,'inf'      => Xpresion::Alias('infinity')
+    ));
 
-    XpresionUtils::$dummy = create_function('$Var,$Fn,$Cache', 'return null;');
-    
-    self::$_inited = true;
+    self::$_configured = true;
     }
     
 }
