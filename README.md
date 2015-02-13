@@ -5,6 +5,7 @@ Beeld
 
 **version 0.7.1**
 
+![beeld is a bee that builds flowers](/beeld.jpg)
 
 This is a new framework and tool for building projects from sources, which is based on (and extends) the [previous buildtools used here](https://github.com/foo123/scripts)
 
