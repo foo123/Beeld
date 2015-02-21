@@ -2,7 +2,7 @@
 *
 *   Xpresion
 *   Simple eXpression parser engine with variables and custom functions support for PHP, Python, Node/JS, ActionScript
-*   @version: 0.5.1
+*   @version: 0.6
 *
 *   https://github.com/foo123/Xpresion
 *
@@ -34,9 +34,9 @@
     
     "use strict";
     
-    var __version__ = "0.5.1",
+    var __version__ = "0.6",
     
-        PROTO = 'prototype', HAS = 'hasOwnProperty', 
+        PROTO = 'prototype', HAS = 'hasOwnProperty', toString = Object[PROTO].toString,
         toJSON = JSON.stringify, Keys = Object.keys, Extend = Object.create,
         
         F = function( a, f ){ return new Function( a, f ); },
@@ -46,6 +46,20 @@
         NEWLINE = /\n\r|\r\n|\n|\r/g, SQUOTE = /'/g,
         
         dummy = function( /*Var, Fn, Cache*/ ){ return null; },
+        
+        evaluator_factory = function(evaluator_str,Fn,Cache) {
+            var evaluator = F('Fn,Cache', [
+            'return function evaluator(Var){',
+            '    "use strict";', 
+            '    return ' + evaluator_str + ';',
+            '};'
+            ].join("\n"))(Fn,Cache);
+            return evaluator;
+        },
+        
+        is_string = function( v ) {
+            return (v instanceof String) || ('[object String]' === toString.call(v));
+        },
         
         Tpl, Node, Alias, Tok, Op, Func, Xpresion,
         BLOCKS = 'BLOCKS', OPS = 'OPERATORS', FUNCS = 'FUNCTIONS',
@@ -142,6 +156,17 @@
                 a = c;
             }
         }
+        return a;
+    };
+    Tpl.multisplit_re = function multisplit_re( tpl, re ) {
+        var a = [ ], i = 0, m;
+        while ( m = re.exec( tpl ) )
+        {
+            a.push([1, tpl.slice(i, re.lastIndex - m[0].length)]);
+            a.push([0, m[1] ? m[1] : m[0]]);
+            i = re.lastIndex;
+        }
+        a.push([1, tpl.slice(i)]);
         return a;
     };
     Tpl.arg = function( key, argslen ) { 
@@ -271,11 +296,30 @@
         ,children: null
         ,pos: null
         ,op_parts: null
+        ,op_def: null
         ,op_index: null
-        ,op_next: function( op ) {
-            var self = this,
+        ,op_next: function( op, pos, op_queue, token_queue ) {
+            var self = this, 
                 is_next = (0 === self.op_parts.indexOf( op.input ));
-            if ( is_next ) self.op_parts.shift( );
+            if ( is_next )
+            {
+                if ( 0 === self.op_def[0][0] )
+                {
+                    if ( !Op.match_args(self.op_def[0][2], pos-1, op_queue, token_queue ) )
+                    {
+                        is_next = false;
+                    }
+                    else
+                    {
+                        self.op_def.shift( );
+                    }
+                }
+            }
+            if ( is_next ) 
+            {
+                self.op_def.shift( );
+                self.op_parts.shift( );
+            }
             return is_next;
         }
         ,op_complete: function( ) {
@@ -292,6 +336,7 @@
             self.pos = null;
             self.node = null;
             self.op_parts = null;
+            self.op_def = null;
             self.op_index = null;
             c = self.children = null;
             return self;
@@ -347,8 +392,8 @@
         return output[ 0 ];
     };
     
-    Xpresion.reduce = function( token_queue, op_queue, nop_queue, current_op, pos ) {
-        var entry, op, n, opc, fixity, nop = null, nop_index = 0;
+    Xpresion.reduce = function( token_queue, op_queue, nop_queue, current_op, pos, err ) {
+        var entry, op, n, opc, fixity, nop = null, nop_index = 0, validation;
         /*
             n-ary operatots (eg ternary) or composite operators
             as operators with multi-parts
@@ -378,7 +423,15 @@
             // push to nop_queue/op_queue
             if ( T_N_OP === opc.type )
             {
-                n = opc.node(null, pos, op_queue.length+1);
+                validation = opc.validate(pos, op_queue, token_queue);
+                if ( !validation[0] )
+                {
+                    // operator is not valid in current state
+                    err.err = true;
+                    err.msg = validation[1];
+                    return false;
+                }
+                n = opc.node(null, pos, op_queue, token_queue);
                 nop_queue.unshift( n );
                 op_queue.unshift( n );
             }
@@ -392,7 +445,7 @@
                 
                 // n-ary/multi-part operator, further parts
                 // combine one-by-one, until n-ary operator is complete
-                if ( nop && nop.op_next( opc ) )
+                if ( nop && nop.op_next(opc, pos, op_queue, token_queue) )
                 {
                     while ( op_queue.length > nop_index )
                     {
@@ -412,6 +465,17 @@
                     else
                     {
                         return;
+                    }
+                }
+                else
+                {
+                    validation = opc.validate(pos, op_queue, token_queue);
+                    if ( !validation[0] )
+                    {
+                        // operator is not valid in current state
+                        err.err = true;
+                        err.msg = validation[1];
+                        return false;
                     }
                 }
                 
@@ -491,7 +555,7 @@
             ,RE = xpr.RE, BLOCK = xpr[BLOCKS], block, block_rest
             ,t_var_is_also_ident = !RE[HAS]('t_var')
             ,evaluator
-            ,err = 0, errpos, errmsg
+            ,err = 0, errpos, errmsg, errors = {err: false, msg: ''}
         ;
         
         expr = xpr.source;
@@ -502,7 +566,7 @@
         xpr.variables = { };
         AST = [ ]; OPS = [ ]; NOPS = [ ]; 
         t_index = 0; i = 0;
-        
+        err = 0;
         while ( i < l )
         {
             ch = expr.charAt( i );
@@ -569,7 +633,13 @@
                 if ( false !== t )
                 {
                     t_index+=1;
-                    reduce( AST, OPS, NOPS, t, t_index );
+                    reduce( AST, OPS, NOPS, t, t_index, errors );
+                    if ( errors.err )
+                    {
+                        err = 1;
+                        errmsg = errors.msg;
+                        break;
+                    }
                     i += m[ 0 ].length;
                     continue;
                 }
@@ -598,7 +668,13 @@
                 if ( false !== t )
                 {
                     t_index+=1;
-                    reduce( AST, OPS, NOPS, t, t_index );
+                    reduce( AST, OPS, NOPS, t, t_index, errors );
+                    if ( errors.err )
+                    {
+                        err = 1;
+                        errmsg = errors.msg;
+                        break;
+                    }
                     i += v.length;
                     continue;
                 }
@@ -630,7 +706,13 @@
                 if ( false !== t )
                 {
                     t_index+=1;
-                    reduce( AST, OPS, NOPS, t, t_index );
+                    reduce( AST, OPS, NOPS, t, t_index, errors );
+                    if ( errors.err )
+                    {
+                        err = 1;
+                        errmsg = errors.msg;
+                        break;
+                    }
                     i += m[ 0 ].length;
                     continue;
                 }
@@ -642,13 +724,17 @@
             }
         }
         
-        err = 0;
-        reduce( AST, OPS, NOPS );
-        
-        if ( (1 !== AST.length) || (OPS.length > 0) )
+        if ( !err )
         {
-            err = 1;
-            errmsg = 'Parse Error, Mismatched Parentheses or Operators';
+            reduce( AST, OPS, NOPS );
+            
+            if ( (1 !== AST.length) || (OPS.length > 0) )
+            {
+                err = 1;
+                errmsg = 'Parse Error, Mismatched Parentheses or Operators';
+                
+                //console.log(AST);
+            }
         }
         
         if ( !err )
@@ -692,6 +778,10 @@
     Xpresion.render = function( tok, args ) { 
         return tok.render( args ); 
     };
+    
+    /*Xpresion.evaluate = function( tok, args ) { 
+        return tok.evaluate( args ); 
+    };*/
     
     Xpresion.defRE = function( obj, RE ) {
         if ( 'object' === typeof obj )
@@ -837,6 +927,10 @@
             else                                    out = token;
             return lparen + out + rparen;
         }
+        ,evaluate: function( args ) {
+            // todo
+            return null;
+        }
         ,node: function( args, pos ) {
             return Node(this.type, this, !!args ? args : null, pos)
         }
@@ -845,19 +939,16 @@
         }
     };
     
-    Xpresion.Op = Op = function Op( input, fixity, associativity, priority, arity, output, otype, ofixity ) {
+    Xpresion.Op = Op = function Op( input, fixity, associativity, priority, /*arity,*/ output, otype, ofixity ) {
         var self = this;
         if ( !(self instanceof Op) ) 
-            return new Op(input, fixity, associativity, priority, arity, output, otype, ofixity);
+            return new Op(input, fixity, associativity, priority, /*arity,*/ output, otype, ofixity);
         
-        input = input || '';
-        output = output || '';
-        self.parts = [].concat( input );
-        
-        // n-ary/multi-part operator
-        if (input && input.push && input.pop) self.type = T_N_OP;
-        // default operator
-        else self.type = T_OP;
+        input = input || ''; output = output || '';
+        var opdef = Op.parse_definition( input );
+        self.type = opdef[0];
+        self.opdef = opdef[1];
+        self.parts = opdef[2];
         
         if ( output && !(output instanceof Tpl) ) output = Tpl(output);
         
@@ -866,7 +957,8 @@
         self.fixity = fixity || PREFIX;
         self.associativity = associativity || DEFAULT;
         self.priority = priority || 1000;
-        self.arity = arity || 0;
+        self.arity = opdef[3];
+        //self.arity = arity || 0;
         self.otype = undef !== otype ? otype : T_DFT;
         self.ofixity = undef !== ofixity ? ofixity : self.fixity;
         self.parenthesize = false;
@@ -875,13 +967,76 @@
     };
     Op.Condition = function( f ) {
         return ['function'===typeof f[0] 
-                ? f[0] 
-                : Tpl.compile(Tpl.multisplit(f[0],{'${POS}':0,'${TOKS}':1,'${OPS}':2,'${TOK}':3,'${OP}':4,'${PREV_IS_OP}':5,'${DEDUCED_TYPE}':6,'Xpresion':7}), true),
-                f[1]];
+        ? f[0] 
+        : Tpl.compile(Tpl.multisplit(f[0],{'${POS}':0,'${TOKS}':1,'${OPS}':2,'${TOK}':3,'${OP}':4,'${PREV_IS_OP}':5,'${DEDUCED_TYPE}':6,'Xpresion':7}), true),
+        f[1]
+        ];
+    };
+    Op.parse_definition = function( op_def ) {
+        var parts = [], op = [], arity = 0, type, i;
+        if ( is_string(op_def) )
+        {
+            // assume infix, arity = 2;
+            op_def = [1,op_def,1];
+        }
+        else
+        {
+            op_def = [].concat(op_def);
+        }
+        for (i=0; i<op_def.length; i++)
+        {
+            if ( is_string( op_def[i] ) )
+            {
+                parts.push(op_def[i]);
+                op.push([1, i, op_def[i]]);
+            }
+            else
+            {
+                op.push([0, i, op_def[i]]);
+                arity += op_def[i];
+            }
+        }
+        if ( 1 === parts.length && 1 === op.length )
+        {
+            op = [[0, 0, 1], [1, 1, parts[0]], [0, 2, 1]];
+            arity = 2; type = T_OP;
+        }
+        else
+        {
+            type = parts.length > 1 ? T_N_OP : T_OP;
+        }
+        return [type, op, parts, arity];
+    };
+    Op.match_args = function( expected_args, args_pos, op_queue, token_queue ) {
+        var tl = token_queue.length,
+            //ol = op_queue.length,
+            t = tl-1, /*o = 0,*/ num_args = 0,
+            /*p1,*/ p2, INF = -10
+        ;
+        while (num_args < expected_args || t >= 0 /*|| o < ol*/ )
+        {
+            //p1 = o < ol ? op_queue[o].pos : INF;
+            p2 = t >= 0 ? token_queue[t].pos : INF;
+            /*if ( args_pos === p1 ) 
+            {
+                num_args++;
+                args_pos--;
+                o++;
+            }
+            else*/ if ( args_pos === p2 ) 
+            {
+                num_args++;
+                args_pos--;
+                t--;
+            }
+            else break;
+        }
+        return num_args >= expected_args;
     };
     Op[PROTO] = Extend( Tok[PROTO] );
     Op[PROTO].otype = null;
     Op[PROTO].ofixity = null;
+    Op[PROTO].opdef = null;
     Op[PROTO].parts = null;
     Op[PROTO].morphes = null;
     Op[PROTO].dispose = function( ) {
@@ -889,6 +1044,7 @@
         Tok[PROTO].dispose.call(self);
         self.otype = null;
         self.ofixity = null;
+        self.opdef = null;
         self.parts = null;
         self.morphes = null;
         return self;
@@ -956,6 +1112,19 @@
             out = op + lparen + args.join(comma) + rparen;
         return Tok(output_type, out, out);
     };
+    Op[PROTO].validate = function( pos, op_queue, token_queue ) {
+        var self = this, opdef = self.opdef, 
+            valid = true, msg = '';
+        if ( 0 === opdef[0][0] ) // expecting argument(s)
+        {
+            if ( !Op.match_args(opdef[0][2], pos-1, op_queue, token_queue ) )
+            {
+                valid = false;
+                msg = 'Operator "' + self.input + '" expecting ' + opdef[0][2] + ' prior argument(s)';
+            }
+        }
+        return [valid, msg];
+    };
     Op[PROTO].node = function( args, pos ) {
         args = args || [];
         var self = this, otype = self.otype, n;
@@ -966,7 +1135,8 @@
         if ( (T_N_OP === self.type) && (arguments.length > 2) )
         {
             n.op_parts = self.parts.slice(1);
-            n.op_index = arguments[2];
+            n.op_def = self.opdef.slice(0 === self.opdef[0][0] ? 2 : 1);
+            n.op_index = arguments[2].length+1;
         }
         return n;
     };
@@ -974,7 +1144,7 @@
     Xpresion.Func = Func = function Func( input, output, otype, priority, associativity, fixity ) {
         var self = this;
         if ( !(self instanceof Func) ) return new Func(input, output, otype, priority, associativity, fixity);
-        Op.call(self, input, PREFIX, associativity||RIGHT, priority||5, 1, output, otype, fixity||PREFIX);
+        Op.call(self, is_string(input) ? [input, 1] : input, PREFIX, associativity||RIGHT, priority||5, /*1,*/ output, otype, fixity||PREFIX);
         self.type = T_FUN;
     };
     Func[PROTO] = Extend( Op[PROTO] );
@@ -1037,7 +1207,7 @@
         ,compile: function( AST ) {
             // depth-first traversal and rendering of Abstract Syntax Tree (AST)
             var evaluator_str = Node.DFT( AST, Xpresion.render, true );
-            return [evaluator_str, F('Var,Fn,Cache', '"use strict"; return ' + evaluator_str + ';')];
+            return [evaluator_str, evaluator_factory(evaluator_str,this.Fn,this._cache)];
         }
         
         ,evaluator: function( evaluator ) {
@@ -1049,10 +1219,9 @@
             return this._evaluator;
         }
         
-        ,evaluate: function( data, Fn ) {
+        ,evaluate: function( data ) {
             if ( 1 > arguments.length ) data = {};
-            if ( 2 > arguments.length ) Fn = this.Fn;
-            return this._evaluator( data, Fn, this._cache );
+            return this._evaluator( data );
         }
         
         ,debug: function( data ) {
@@ -1184,11 +1353,9 @@
             else return false;
             return true;
         }
-        ,'ary_merge'   :   function(a1, a2){
-            return [].concat(a1,a2);
-        }
+        ,'ary_merge'   :   function(a1, a2){return [].concat(a1,a2);}
         ,'match'  :   function( str, regex ){ return regex.test( str ); }
-        ,'contains':  function( list, item ){ return -1 < list.indexOf( item ); }
+        ,'contains':  function( o, i ){return (o.substr||o.pop) ? (-1 < o.indexOf(i)) : o.hasOwnProperty(i);}
         });
         __inited = true;
         if ( true === andConfigure ) Xpresion.defaultConfiguration( );
@@ -1200,124 +1367,121 @@
     Xpresion.defOp({
     // e.g https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
     /*------------------------------------------------------------------------------------------------
-     symbol     input       ,fixity     ,associativity  ,priority   ,arity  ,output     ,output_type
+     symbol     input           ,fixity     ,associativity  ,priority   ,output     ,output_type
     --------------------------------------------------------------------------------------------------*/
                 // bra-kets as n-ary operators
      '('    :   Op(
-                ['(',')']   ,POSTFIX    ,RIGHT          ,1          ,1      ,'$0'       ,T_DUM 
+                ['(',1,')']     ,POSTFIX    ,RIGHT          ,1          ,'$0'       ,T_DUM 
                 )
-    ,')'    :   Op(')')
+    ,')'    :   Op([1,')'])
     ,'['    :   Op(
-                ['[',']']   ,POSTFIX    ,RIGHT          ,2          ,1      ,'[$0]'     ,T_ARY 
+                ['[',1,']']     ,POSTFIX    ,RIGHT          ,2          ,'[$0]'     ,T_ARY 
                 )
-    ,']'    :   Op(']')
+    ,']'    :   Op([1,']'])
     ,','    :   Op(
-                ','         ,INFIX      ,LEFT           ,3          ,2      ,'$0,$1'    ,T_DFT 
+                [1,',',1]       ,INFIX      ,LEFT           ,3          ,'$0,$1'    ,T_DFT 
                 )
                 // n-ary (ternary) if-then-else operator
     ,'?'    :   Op(
-                ['?',':']   ,INFIX      ,RIGHT          ,100        ,3      ,'($0?$1:$2)'   ,T_BOL 
+                [1,'?',1,':',1] ,INFIX      ,RIGHT          ,100        ,'($0?$1:$2)'   ,T_BOL 
                 )
-    ,':'    :   Op(':')
+    ,':'    :   Op([1,':',1])
     
     ,'!'    :   Op(
-                '!'         ,PREFIX     ,RIGHT          ,10         ,1      ,'!$0'      ,T_BOL 
+                ['!',1]         ,PREFIX     ,RIGHT          ,10         ,'!$0'      ,T_BOL 
                 )
     ,'~'    :   Op(
-                '~'         ,PREFIX     ,RIGHT          ,10         ,1      ,'~$0'      ,T_NUM 
+                ['~',1]         ,PREFIX     ,RIGHT          ,10         ,'~$0'      ,T_NUM 
                 )
     ,'^'    :   Op(
-                '^'         ,INFIX      ,RIGHT          ,11         ,2      ,'Math.pow($0,$1)'  ,T_NUM 
+                [1,'^',1]       ,INFIX      ,RIGHT          ,11         ,'Math.pow($0,$1)'  ,T_NUM 
                 )
     ,'*'    :   Op(
-                '*'         ,INFIX      ,LEFT           ,20         ,2      ,'($0*$1)'  ,T_NUM 
+                [1,'*',1]       ,INFIX      ,LEFT           ,20         ,'($0*$1)'  ,T_NUM 
                 ) 
     ,'/'    :   Op(
-                '/'         ,INFIX      ,LEFT           ,20         ,2      ,'($0/$1)'  ,T_NUM 
+                [1,'/',1]       ,INFIX      ,LEFT           ,20         ,'($0/$1)'  ,T_NUM 
                 )
     ,'%'    :   Op(
-                '%'         ,INFIX      ,LEFT           ,20         ,2      ,'($0%$1)'  ,T_NUM 
+                [1,'%',1]       ,INFIX      ,LEFT           ,20         ,'($0%$1)'  ,T_NUM 
                 )
                 // addition/concatenation/unary plus as polymorphic operators
     ,'+'    :   Op().Polymorphic([
                 // array concatenation
                 ["${TOK} && !${PREV_IS_OP} && (${DEDUCED_TYPE}===Xpresion.T_ARY)", Op(
-                '+'         ,INFIX      ,LEFT           ,25         ,2      ,'Fn.ary_merge($0,$1)'  ,T_ARY 
+                [1,'+',1]       ,INFIX      ,LEFT           ,25         ,'Fn.ary_merge($0,$1)'  ,T_ARY 
                 )]
                 // string concatenation
                 ,["${TOK} && !${PREV_IS_OP} && (${DEDUCED_TYPE}===Xpresion.T_STR)", Op(
-                '+'         ,INFIX      ,LEFT           ,25         ,2      ,'($0+String($1))'  ,T_STR 
+                [1,'+',1]       ,INFIX      ,LEFT           ,25         ,'($0+String($1))'  ,T_STR 
                 )]
                 // numeric addition
                 ,["${TOK} && !${PREV_IS_OP}", Op(
-                '+'         ,INFIX      ,LEFT           ,25         ,2      ,'($0+$1)'  ,T_NUM 
+                [1,'+',1]       ,INFIX      ,LEFT           ,25         ,'($0+$1)'  ,T_NUM 
                 )]
                 // unary plus
                 ,["!${TOK} || ${PREV_IS_OP}", Op(
-                '+'         ,PREFIX     ,RIGHT          ,4          ,1      ,'$0'       ,T_NUM 
+                ['+',1]         ,PREFIX     ,RIGHT          ,4          ,'$0'       ,T_NUM 
                 )]
                 ])
     ,'-'    :   Op().Polymorphic([
                 // numeric subtraction
                 ["${TOK} && !${PREV_IS_OP}", Op(
-                '-'         ,INFIX      ,LEFT           ,25         ,2      ,'($0-$1)'  ,T_NUM 
+                [1,'-',1]       ,INFIX      ,LEFT           ,25         ,'($0-$1)'  ,T_NUM 
                 )]
                 // unary negation
                 ,["!${TOK} || ${PREV_IS_OP}", Op(
-                '-'         ,PREFIX     ,RIGHT          ,4          ,1      ,'(-$0)'        ,T_NUM 
+                ['-',1]         ,PREFIX     ,RIGHT          ,4          ,'(-$0)'        ,T_NUM 
                 )]
                 ])
     ,'>>'   :   Op(
-                '>>'        ,INFIX      ,LEFT           ,30         ,2      ,'($0>>$1)'     ,T_NUM 
+                [1,'>>',1]      ,INFIX      ,LEFT           ,30         ,'($0>>$1)'     ,T_NUM 
                 )
     ,'<<'   :   Op(
-                '<<'        ,INFIX      ,LEFT           ,30         ,2      ,'($0<<$1)'     ,T_NUM 
+                [1,'<<',1]      ,INFIX      ,LEFT           ,30         ,'($0<<$1)'     ,T_NUM 
                 )
     ,'>'    :   Op(
-                '>'         ,INFIX      ,LEFT           ,35         ,2      ,'($0>$1)'      ,T_BOL 
+                [1,'>',1]       ,INFIX      ,LEFT           ,35         ,'($0>$1)'      ,T_BOL 
                 )
     ,'<'    :   Op(
-                '<'         ,INFIX      ,LEFT           ,35         ,2      ,'($0<$1)'      ,T_BOL 
+                [1,'<',1]       ,INFIX      ,LEFT           ,35         ,'($0<$1)'      ,T_BOL 
                 )
     ,'>='   :   Op(
-                '>='        ,INFIX      ,LEFT           ,35         ,2      ,'($0>=$1)'     ,T_BOL 
+                [1,'>=',1]      ,INFIX      ,LEFT           ,35         ,'($0>=$1)'     ,T_BOL 
                 )
     ,'<='   :   Op(
-                '<='        ,INFIX      ,LEFT           ,35         ,2      ,'($0<=$1)'     ,T_BOL 
+                [1,'<=',1]      ,INFIX      ,LEFT           ,35         ,'($0<=$1)'     ,T_BOL 
                 )
     ,'=='   :   Op().Polymorphic([
                 // array equivalence
                 ["${DEDUCED_TYPE}===Xpresion.T_ARY", Op(
-                '=='        ,INFIX      ,LEFT           ,40         ,2      ,'Fn.ary_eq($0,$1)' ,T_BOL 
+                [1,'==',1]      ,INFIX      ,LEFT           ,40         ,'Fn.ary_eq($0,$1)' ,T_BOL 
                 )]
                 // default equivalence
                 ,["true", Op(
-                '=='        ,INFIX      ,LEFT           ,40         ,2      ,'($0==$1)'     ,T_BOL 
+                [1,'==',1]      ,INFIX      ,LEFT           ,40         ,'($0==$1)'     ,T_BOL 
                 )]
                 ])
     ,'!='   :   Op(
-                '!='        ,INFIX      ,LEFT           ,40         ,2      ,'($0!=$1)'     ,T_BOL 
+                [1,'!=',1]      ,INFIX      ,LEFT           ,40         ,'($0!=$1)'     ,T_BOL 
                 )
     ,'matches': Op(
-                'matches'   ,INFIX      ,NONE           ,40         ,2      ,'$0.test($1)'  ,T_BOL 
+                [1,'matches',1] ,INFIX      ,NONE           ,40         ,'$0.test($1)'  ,T_BOL 
                 )
     ,'in'   :   Op(
-                'in'        ,INFIX      ,NONE           ,40         ,2      ,'(-1<$1.indexOf($0))'  ,T_BOL 
-                )
-    ,'has'  :   Op(
-                'has'       ,INFIX      ,NONE           ,40         ,2      ,'(-1<$0.indexOf($1))'  ,T_BOL 
+                [1,'in',1]      ,INFIX      ,NONE           ,40         ,'Fn.contains($1,$0)'  ,T_BOL 
                 )
     ,'&'    :   Op(
-                '&'         ,INFIX      ,LEFT           ,45         ,2      ,'($0&$1)'      ,T_NUM 
+                [1,'&',1]       ,INFIX      ,LEFT           ,45         ,'($0&$1)'      ,T_NUM 
                 )
     ,'|'    :   Op(
-                '|'         ,INFIX      ,LEFT           ,46         ,2      ,'($0|$1)'      ,T_NUM 
+                [1,'|',1]       ,INFIX      ,LEFT           ,46         ,'($0|$1)'      ,T_NUM 
                 )
     ,'&&'   :   Op(
-                '&&'        ,INFIX      ,LEFT           ,47         ,2      ,'($0&&$1)'     ,T_BOL 
+                [1,'&&',1]      ,INFIX      ,LEFT           ,47         ,'($0&&$1)'     ,T_BOL 
                 )
     ,'||'   :   Op(
-                '||'        ,INFIX      ,LEFT           ,48         ,2      ,'($0||$1)'     ,T_BOL 
+                [1,'||',1]      ,INFIX      ,LEFT           ,48         ,'($0||$1)'     ,T_BOL 
                 )
     /*------------------------------------------
                     aliases
