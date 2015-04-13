@@ -1,4 +1,9 @@
 {
+"settings":{
+    "Xpresion": "Xpresion::",
+    "RegExp": "RegExp::" 
+},
+
 "plugins":[
     {"doc": "!plg:doc"}
 ],
@@ -29,6 +34,7 @@
             ,{"@@EXPORTS@@": "exports"}
             ,{"@@MODULE_NAME@@": "ModelView"}
             ,{"@@VERSION@@": "0.51"}
+            ,{"@@DATE@@": "Xpresion::date(\"Y-m-d H:i:s\")"}
         ]},
         
         {"process-shell":[
@@ -41,7 +47,7 @@
         {"doc":{
              "startdoc": "/**[DOC_MARKDOWN]"
             ,"enddoc": "[/DOC_MARKDOWN]**/"
-            ,"trimx": "\\s*\\*[ ]?"
+            ,"trim": "RegExp::^\\s*\\*[ ]?"
             ,"output": "./test-doc.md"
         }},
         

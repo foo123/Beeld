@@ -15,7 +15,8 @@ def beeld_plugin_action_doc(evt):
     doc = current.action_cfg
     if doc and ('output' in doc):
         
-        docFile = Beeld.Utils.get_real_path(doc['output'], options.basePath)
+        doc['output'] = Beeld.Utils.xpresion(doc['output'], evt) # parse xpresion if any
+        docFile = Beeld.Utils.get_real_path(Beeld.Utils.evaluate(doc['output'], {}), options.basePath)
         startDoc = doc['startdoc']
         endDoc = doc['enddoc']
         
@@ -25,13 +26,14 @@ def beeld_plugin_action_doc(evt):
         
         sep = doc['separator'] if 'separator' in doc else "\n\n"
             
-        if 'trimx' in doc: 
-            isRegex = 1
-            _trim = re.compile('^' + doc['trimx'])
-        elif 'trim' in doc: 
-            isRegex = 0
-            _trim = doc['trim']
-            _trimlen = len(_trim)
+        if 'trim' in doc: 
+            _trim = Beeld.Utils.regex(doc['trim'], evt)
+            if _trim is False:
+                _trim = doc['trim']
+                _trimlen = len(_trim)
+                isRegex = 0
+            else:
+                isRegex = 1
             
         
         docs = []

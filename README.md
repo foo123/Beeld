@@ -3,7 +3,7 @@ Beeld
 
 **A scriptable, extendable and configurable source code builder framework and tool in Node/Python/PHP**
 
-**version 0.7.1**
+**version 0.8-alpha**
 
 ![beeld is a bee that builds flowers](/beeld.jpg)
 
@@ -12,21 +12,26 @@ This is a new framework and tool for building projects from sources, which is ba
 
 ###Usage
 
-* Modify the *sample-config.custom* or *sample-config.json* or *sample-config.yaml* <del>or sample-config.ini</del> file(s) to include the configuration settings and parameters
-* Configuration file can be in custom format (default), JSON format (.json) or YAML format (.yaml, .yml) <del>or INI format (.ini)</del>
+* Modify the *beeld-sample.config* or *beeld-sample.json* or *beeld-sample.yaml* <del>or beeld-sample.ini</del> file(s) to include the configuration settings and parameters
+* Configuration file can be in custom config format (default), JSON format (.json) or YAML format (.yaml, .yml) <del>or INI format (.ini)</del>
 * Run the .bat or .sh scripts to build the package
 
 Each tool/compiler, if run with no parameters in the command-line, will print a help screen explaining usage options.
 Also the sample-config files and build.bat, build.sh files, demonstrate how the build tools are used
 
 
-###Plugins, Extensions, Scripting
+###Plugins, Extensions, Scripting, Custom Dynamic Expressions
 
 The framework can be extended by plugins. The plugin code can be in the Beeld/plugins folder or even in current working directory. Each plugin can define a new action to be used on the source data through a pipeline.
 
 The plugin and the new action are both defined in each config file (see sample config files).
 
 Furthermore the framework has a built-in "replace" action to replace text in sources and a "process-shell" action which allows to manipulate the source data through direct shell scripting (for example for some fast shell text manipulation)
+
+**NEW in version 0.8+**
+
+The framework allows custom powerful dynamic expressions (and regular expressions) to be part of config data and parameters, via the [Xpresion framework](https://github.com/foo123/Xpresion). The beeld.config file can include a `settings` part which defines the prefixes for Xpresion dynamic expressions and Regular Expressions (if any) used in the config file. The parsing and evaluation will be automatic (see sample config files for examples). An common example of the use of custom expressions is the use of current date to be displayed in the final built file (one can use a custom expression for that which uses the `date` function as part of `replace` data to be replaced in the file where needed). Another one, is to replace data in the files not simply by another string but by the contents of a whole file (one would use an expression with the `file` function to load the contents of a file dynamicaly)
+
 
 
 ###UMD Templates
@@ -61,6 +66,9 @@ __Common Dependencies__
 * CSS Minifier (python) (included)
 * CSS Minifier (php) (included)
 * CSS Minifier (node) (included)
+* Xpresion (python) (included)
+* Xpresion (php) (included)
+* Xpresion (node) (included)
 
 
 *URL* [Nikos Web Development](http://nikos-web-development.netai.net/ "Nikos Web Development")  

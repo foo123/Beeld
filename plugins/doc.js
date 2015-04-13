@@ -5,7 +5,10 @@ module.exports = {
     beeld_plugin_doc: function( builder, Beeld ) {
         var HAS = 'hasOwnProperty', 
             write_async = Beeld.Utils.write_async,
-            get_real_path = Beeld.Utils.get_real_path
+            get_real_path = Beeld.Utils.get_real_path,
+            regex = Beeld.Utils.regex,
+            xpresion = Beeld.Utils.xpresion,
+            evaluate = Beeld.Utils.evaluate
         ;
         var action_doc = function action_doc( evt ){
             var params = evt.data.data, 
@@ -15,7 +18,8 @@ module.exports = {
                 doc = current.action_cfg;
             if ( doc && doc[HAS]('output') )
             {
-                var docFile = get_real_path(doc['output'], options.basePath),
+                doc['output'] = xpresion(doc['output'], evt); // parse xpresion if any
+                var docFile = get_real_path(evaluate(doc['output'], {}), options.basePath), 
                     docs = [], startDoc = doc['startdoc'], endDoc = doc['enddoc'], 
                     isRegex = 0, _trim = null, _trimlen = 0,
                     blocks, i, l, tmp, j, l2, sep
@@ -23,16 +27,19 @@ module.exports = {
                 
                 sep = doc[HAS]('separator') ? doc['separator'] : "\n\n";
                 
-                if ( doc[HAS]('trimx') )
+                if ( doc[HAS]('trim') )
                 {
-                    isRegex = 1;
-                    _trim = new RegExp('^'+doc['trimx']);
-                }
-                else if ( doc[HAS]('trim') )
-                {
-                    isRegex = 0;
-                    _trim = doc['trim'];
-                    _trimlen = _trim.length;
+                    _trim = regex(doc.trim, evt);
+                    if ( false === _trim )
+                    {
+                        _trim = doc.trim;
+                        _trimlen = _trim.length;
+                        isRegex = 0;
+                    }
+                    else
+                    {
+                        isRegex = 1;
+                    }
                 }
                 
                 // extract doc blocks

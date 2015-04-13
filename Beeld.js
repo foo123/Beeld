@@ -5,7 +5,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.7.1
+*   @version: 0.8-alpha
 *
 **/
 !function (root, moduleName, moduleDefinition) {
@@ -96,7 +96,7 @@
         
         // needed variables
         BEELD_FILE, BEELD_ROOT, BEELD_INCLUDES, BEELD_PARSERS, BEELD_COMPILERS, BEELD_TEMPLATES, BEELD_PLUGINS,
-        TPLS = { }, PublishSubscribe, /*List, Map,*/ OrderedMap, 
+        TPLS = { }, PublishSubscribe, Xpresion, /*List, Map,*/ OrderedMap, 
         BeeldParser, BeeldCompiler, Beeld
     ; 
     
@@ -109,6 +109,7 @@
     BEELD_PLUGINS = join_path(BEELD_ROOT, "plugins") + '/';
 
     PublishSubscribe = require(BEELD_INCLUDES + 'PublishSubscribe.js');
+    Xpresion = require(BEELD_INCLUDES + 'Xpresion.js');
     
     //List = Array;
     //Map = Object;
@@ -182,6 +183,37 @@
             out = out.split(reps[i][0]).join(reps[i][1]);
         }
         return out;
+    }
+    
+    function regex( rex, evt )
+    {
+        var settings = evt.data.data.config.settings;
+        if (rex instanceof RegExp) return rex;
+        else if (settings.RegExp && rex.substr && startsWith(rex, settings.RegExp)) return new RegExp(rex.substr(settings.RegExp.length));
+        return false;
+    }
+    
+    function xpresion( xpr, evt ) 
+    {
+        var settings = evt.data.data.config.settings;
+        if ( settings.Xpresion )
+        {
+            if ( xpr instanceof Xpresion ) 
+            {
+                return xpr;
+            }
+            else if ( xpr.substr && startsWith(xpr, settings.Xpresion) )
+            {
+                xpr = new Xpresion( xpr.substr(settings.Xpresion.length) );
+                return xpr;
+            }
+        }
+        return xpr;
+    }
+    
+    function evaluate( xpr, data ) 
+    {
+        return xpr instanceof Xpresion ? xpr.evaluate(data) : xpr;
     }
     
     //
@@ -318,6 +350,11 @@
         else return file; 
     }
     
+    function read_file( filename, basePath )
+    {
+        return read( get_real_path( filename, basePath ) );
+    }
+    
     BeeldParser = function(path, class_name, name) {
         var self = this;
         self.path = path;
@@ -406,7 +443,7 @@
         ,'action_out': Beeld.Actions.action_out
         };
     };
-    Beeld.VERSION = "0.7.1";
+    Beeld.VERSION = "0.8-alpha";
     
     Beeld.OrderedMap = function( om ){
         return new OrderedMap(om);
@@ -422,6 +459,8 @@
     
     Beeld.Obj = PublishSubscribe.Data;
     
+    Beeld.Xpresion = Xpresion;
+    
     Beeld.Utils = {
         startsWith: startsWith,
         multi_replace: multi_replace,
@@ -432,7 +471,10 @@
         join_path: join_path,
         tmpfile: tmpfile,
         get_real_path: get_real_path,
-        extend: extend
+        extend: extend,
+        regex: regex,
+        xpresion: xpresion,
+        evaluate: evaluate
     };
     
     //
@@ -457,6 +499,15 @@
     // aliases
     Beeld.Parsers[".yaml"] = Beeld.Parsers[".yml"];
     Beeld.Parsers["*"] = Beeld.Parsers[".custom"];
+    Xpresion.defaultConfiguration();
+    Xpresion.defFunc({
+        'file': Xpresion.Func('file', 'Fn.file($0)'),
+        'tpl':  Xpresion.Func('tpl',  'Fn.tpl($0)')
+    });
+    Xpresion.defRuntimeFunc({
+        'file': read_file,
+        'tpl': get_tpl
+    });
     
     //
     // Beeld default actions
@@ -704,12 +755,15 @@
         if ( current.action_cfg ) 
         {
             var replace = Beeld.OrderedMap(current.action_cfg), rep,
-                hasHeader = !!(data.header && data.header.length)
+                hasHeader = !!(data.header && data.header.length),
+                xpresion_data = {}
             ;
             // ordered map
             while ( replace.hasNext( ) )
             {
                 rep = replace.getNext();
+                rep[1] = Beeld.Utils.xpresion(rep[1], evt); // parse xpresion if any
+                rep[1] = Beeld.Utils.evaluate(rep[1], xpresion_data);
                 data.src = data.src.split(rep[0]).join(rep[1]);
                 if ( hasHeader ) data.header = data.header.split(rep[0]).join(rep[1]);
             }
@@ -1040,11 +1094,21 @@
         });
         params.data = Beeld.Obj();
         params.current = Beeld.Obj();
-        params.config = config;
+
+        if ( config[HAS]('settings') )
+        {
+            if ( !config['settings'][HAS]('RegExp') ) config['settings']['RegExp'] = false;
+            if ( !config['settings'][HAS]('Xpresion') ) config['settings']['Xpresion'] = false;
+        }
+        else
+        {
+            config['settings'] = {'RegExp':false, 'Xpresion':false};
+        }
         if ( config[HAS]('plugins') )
         {
             this.loadPlugins(config.plugins, params.options.basePath);
         }
+        params.config = config;
         return params;
     };
 

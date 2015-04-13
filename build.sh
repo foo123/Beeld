@@ -10,10 +10,10 @@
 # ugliifyjs is default compiler if no compiler specified and minify directive is ON
 
 # to use the python build tool do:
-# python Beeld.py --config "sample-config.json" --compiler yui
+# python Beeld.py --config "beeld-sample.json" --compiler yui
 
 # to use the php build tool do:
-# php -f Beeld.php -- --config="sample-config.yml" --compiler=closure
+# php -f Beeld.php -- --config="beeld-sample.yml" --compiler=closure
 
 # to use the node build tool do:
-node Beeld.js --config "sample-config.custom" --compiler unglifyjs
+node Beeld.js --config "beeld-sample.config" --compiler unglifyjs

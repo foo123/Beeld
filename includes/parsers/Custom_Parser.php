@@ -210,6 +210,7 @@ class Custom_Parser
                 
                 if ( $val )
                 {
+                    $val = trim($val);
                     $valstartswith = $val[0];
                     
                     // quoted value

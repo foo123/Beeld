@@ -6,7 +6,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.7.1
+*   @version: 0.8-alpha
 *
 **/
 if (!class_exists('Beeld'))
@@ -22,6 +22,7 @@ define('BEELD_TEMPLATES', BEELD_ROOT . 'templates' . DIRECTORY_SEPARATOR);
 define('BEELD_PLUGINS', BEELD_ROOT . 'plugins' . DIRECTORY_SEPARATOR);
 
 require(BEELD_INCLUDES . 'PublishSubscribe.php');
+require(BEELD_INCLUDES . 'Xpresion.php');
 
 //
 // beeld utils
@@ -154,6 +155,11 @@ final class BeeldUtils
         return self::$TPLS[$tpl_id];
     }
     
+    public static function read_file($filename, $basePath='')
+    {
+        return file_get_contents( self::get_real_path( $filename, $basePath ) );
+    }
+
     public static function multi_replace($tpl, $reps)
     {
         $out = $tpl;
@@ -162,6 +168,37 @@ final class BeeldUtils
             $out = str_replace($r[0], $r[1], $out);
         }
         return $out;
+    }
+    
+    // http://stackoverflow.com/questions/10778318/test-if-a-string-is-regex
+    public static function regex($rex, $evt) 
+    {
+        $settings = $evt->data->data->config['settings'];
+        if ( $settings['RegExp'] && is_string($rex) && self::startsWith($rex, $settings['RegExp']) ) 
+            return '/' . str_replace('/', '\\/', substr($rex, strlen($settings['RegExp']))) . '/';
+        return false;
+    }
+    
+    public static function xpresion($xpr, $evt) 
+    {
+        $settings = $evt->data->data->config['settings'];
+        if ( $settings['Xpresion'] )
+        {
+            if ( $xpr instanceof Xpresion ) 
+            {
+                return $xpr;
+            }
+            else if ( is_string($xpr) && self::startsWith($xpr, $settings['Xpresion']) )
+            {
+                $xpr = new Xpresion( substr($xpr, strlen($settings['Xpresion'])) );
+                return $xpr;
+            }
+        }
+        return $xpr;
+    }
+    
+    public static function evaluate($xpr, $data) {
+        return $xpr instanceof Xpresion ? $xpr->evaluate($data) : $xpr;
     }
     
     /**
@@ -732,10 +769,12 @@ final class BeeldActions
             // ordered map
             $replace = Beeld::OrderedMap($current->action_cfg);
             $hasHeader = ($data->header && strlen($data->header)) ? true : false;
-            
+            $xpresion_data = array();
             while ($replace->hasNext())
             {
                 $rep = $replace->getNext();
+                $rep[1] = BeeldUtils::xpresion($rep[1], $evt); // parse xpresion if any
+                $rep[1] = BeeldUtils::evaluate($rep[1], $xpresion_data);
                 $data->src = str_replace($rep[0], $rep[1], $data->src);
                 if ( $hasHeader )
                     $data->header = str_replace($rep[0], $rep[1], $data->header);
@@ -882,7 +921,7 @@ final class BeeldActions
 // extends/implements PublishSubscribe
 class Beeld extends PublishSubscribe
 {
-    const VERSION = "0.7.1";
+    const VERSION = "0.8-alpha";
     public static $Parsers = null;
     
     public $actions = null;
@@ -906,6 +945,11 @@ class Beeld extends PublishSubscribe
     {
         return PublishSubscribe::Data($props);
     }
+    
+    /*public static function Xpresion($xpr)
+    {
+        return new Xpresion($xpr);
+    }*/
     
     public static function init( )
     {
@@ -933,6 +977,15 @@ class Beeld extends PublishSubscribe
         // aliases
         self::$Parsers[".yaml"] = self::$Parsers[".yml"];
         self::$Parsers["*"] = self::$Parsers[".custom"];
+        Xpresion::defaultConfiguration();
+        Xpresion::defFunc(array(
+            'file'=> Xpresion::Func('file', '$Fn->file($0)'),
+            'tpl'=>  Xpresion::Func('tpl',  '$Fn->tpl($0)')
+        ));
+        Xpresion::defRuntimeFunc(array(
+            'file'=> array('BeeldUtils', 'read_file'),
+            'tpl'=> array('BeeldUtils', 'get_tpl')
+        ));
     }
     
     public function __construct()
@@ -1049,12 +1102,21 @@ class Beeld extends PublishSubscribe
         ));
         $params->data = Beeld::Obj();
         $params->current = Beeld::Obj();
-        $params->config = $config;
         
+        if ( isset($config['settings']) )
+        {
+            if ( !isset($config['settings']['RegExp']) ) $config['settings']['RegExp'] = false;
+            if ( !isset($config['settings']['Xpresion']) ) $config['settings']['Xpresion'] = false;
+        }
+        else
+        {
+            $config['settings'] = array('RegExp'=>false, 'Xpresion'=>false);
+        }
         if ( isset($config['plugins']) )
         {
             $this->loadPlugins($config['plugins'], $params->options->basePath);
         }
+        $params->config = $config;
         
         return $params;
     }

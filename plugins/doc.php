@@ -13,7 +13,8 @@ function beeld_plugin_action_doc($evt)
     $doc = $current->action_cfg;
     if ( $doc && isset($doc['output']) )
     {
-        $docFile = BeeldUtils::get_real_path($doc['output'], $options->basePath);
+        $doc['output'] = BeeldUtils::xpresion($doc['output'], $evt); // parse xpresion if any
+        $docFile = BeeldUtils::get_real_path(BeeldUtils::evaluate($doc['output'], array()), $options->basePath);
         $startDoc = $doc['startdoc'];
         $endDoc = $doc['enddoc'];
         $isRegex = 0;
@@ -22,16 +23,19 @@ function beeld_plugin_action_doc($evt)
         $docs = array();
         $sep = isset($doc['separator']) ? $doc['separator'] : "\n\n";
             
-        if (isset($doc['trimx']))
+        if (isset($doc['trim']))
         {
-            $isRegex = 1;
-            $_trim = '/^' . str_replace('/', '\\/', $doc['trimx']) . '/';
-        }
-        elseif (isset($doc['trim']))
-        {
-            $isRegex = 0;
-            $_trim = $doc['trim'];
-            $_trimlen = strlen($_trim);
+            $_trim = BeeldUtils::regex($doc['trim'], $evt);
+            if ( false === $_trim )
+            {
+                $_trim = $doc['trim'];
+                $_trimlen = strlen($_trim);
+                $isRegex = 0;
+            }
+            else
+            {
+                $isRegex = 1;
+            }
         }
         
         // extract doc blocks

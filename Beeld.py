@@ -5,7 +5,7 @@
 #   https://github.com/foo123/Beeld
 #
 #   A scriptable and configurable source code builder framework in Node/PHP/Python
-#   @version: 0.7.1
+#   @version: 0.8-alpha
 #
 ##
 
@@ -26,6 +26,7 @@ BEELD_TEMPLATES = os.path.join(BEELD_ROOT, 'templates') + '/'
 BEELD_PLUGINS = os.path.join(BEELD_ROOT, 'plugins') + '/'
 
 from includes.PublishSubscribe import PublishSubscribe
+from includes.Xpresion import Xpresion
 
 #
 # beeld utils
@@ -126,6 +127,10 @@ def get_real_path(file, basePath=''):
     else:
         return file
 
+def read_file(filename, basePath=''):
+    return read( get_real_path( filename, basePath ) )
+    
+    
 TPLS = {}
 def get_tpl(id, enc=None):
     global TPLS
@@ -140,6 +145,28 @@ def multi_replace(tpl, reps):
     for r in reps:
         out = out.replace(r[0], r[1])
     return out
+
+# http://stackoverflow.com/questions/6102019/type-of-compiled-regex-object-in-python
+REGEXP = type(re.compile('regex'))
+def regex(rex, evt):
+    global REGEXP
+    settings = evt.data.data.config['settings']
+    if isinstance(rex, REGEXP): return rex
+    elif settings['RegExp'] and rex.startswith(settings['RegExp']): return re.compile(rex[len(settings['RegExp']):])
+    return False
+    
+def xpresion(xpr, evt):
+    settings = evt.data.data.config['settings']
+    if settings['Xpresion']:
+        if isinstance(xpr,Xpresion):
+            return xpr
+        elif isinstance(xpr, str) and xpr.startswith(settings['Xpresion']):
+            xpr = Xpresion( xpr[len(settings['Xpresion']):] )
+            return xpr
+    return xpr
+
+def evaluate(xpr, data):
+    return xpr.evaluate(data) if isinstance(xpr, Xpresion) else xpr
     
 
 def parseOptions( defaults ):
@@ -513,10 +540,12 @@ class BeeldActions:
                 hasHeader = True
             else:
                 hasHeader = False
-                
+            xpresion_data = {}    
             # ordered map
             while reple.hasNext():
                 rep = reple.getNext()
+                rep[1] = Beeld.Utils.xpresion(rep[1], evt) # parse xpresion if any
+                rep[1] = Beeld.Utils.evaluate(rep[1], xpresion_data)
                 data.src = data.src.replace(rep[0], rep[1])
                 if hasHeader:
                     data.header = data.header.replace(rep[0], rep[1])
@@ -694,6 +723,9 @@ class BeeldUtils:
     join_path = join_path
     tmpfile = tmpfile
     get_real_path = get_real_path
+    regex = regex
+    xpresion = xpresion
+    evaluate = evaluate
 
 #
 # Beeld default parsers
@@ -718,11 +750,20 @@ BeeldParsers = {
 # aliases
 BeeldParsers['.yaml'] = BeeldParsers['.yml']
 BeeldParsers['*'] = BeeldParsers['.custom']
+Xpresion.defaultConfiguration()
+Xpresion.defFunc({
+    'file': Xpresion.Func('file', 'Fn.file($0)'),
+    'tpl':  Xpresion.Func('tpl',  'Fn.tpl($0)')
+})
+Xpresion.defRuntimeFunc({
+    'file': read_file,
+    'tpl': get_tpl
+})
 
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
     
-    VERSION = "0.7.1"
+    VERSION = "0.8-alpha"
     
     def OrderedMap(om):
         return OrderedMap(om)
@@ -736,6 +777,7 @@ class Beeld(PublishSubscribe):
     def Obj(props=None):
         return PublishSubscribe.Data(props)
         
+    Xpresion = Xpresion
     Parsers = BeeldParsers
     Actions = BeeldActions
     Utils = BeeldUtils
@@ -841,10 +883,15 @@ class Beeld(PublishSubscribe):
         })
         params.data = Beeld.Obj()
         params.current = Beeld.Obj()
-        params.config = config
         
+        if 'settings' in config:
+            if 'RegExp' not in config['settings']: config['settings']['RegExp'] = False
+            if 'RegExp' not in config['settings']: config['settings']['RegExp'] = False
+        else:
+            config['settings'] = {'RegExp':False, 'Xpresion':False}
         if 'plugins' in config:
             self.loadPlugins(config['plugins'], params.options.basePath)
+        params.config = config
         
         return params
     

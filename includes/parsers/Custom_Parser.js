@@ -174,7 +174,7 @@
                         // quoted value
                         if ( '"'==valstartswith || "'"==valstartswith || "`"==valstartswith )
                         {
-                            val = getStr(val, valuestartswith)[0];
+                            val = getStr(val, valstartswith)[0];
                         }
                         else
                         {

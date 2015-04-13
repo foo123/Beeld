@@ -10,6 +10,16 @@
 ##
 
 ##
+## any settings for custom expressions used in the configuration (omit if not needed)
+##
+"settings":  #(map)
+    # prefix id for dynamic expressions (via Xpresion) used in config parameters, parsed and evaluated automaticaly
+    "Xpresion": "Xpresion::"
+    # prefix id for any reguilar expressions might be used in config parameters, parsed and evaluated automaticaly
+    "RegExp": "RegExp::" 
+
+
+##
 ## load and use any extra plugins
 ##
 "plugins":  #(ordered map)
@@ -49,6 +59,7 @@
             - "@@EXPORTS@@": "exports"
             - "@@MODULE_NAME@@": "ModelView"
             - "@@VERSION@@": "0.51"
+            - "@@DATE@@": 'Xpresion::date("Y-m-d H:i:s")'
         # allow some pre-process to take place (shell scripting)
         - "process-shell":  #(list)
             - "echo ^/^*^*[DOC_MARKDOWN] >> ${IN}"
@@ -59,7 +70,7 @@
         - "doc":  #(map)
             "startdoc": "/**[DOC_MARKDOWN]"
             "enddoc": "[/DOC_MARKDOWN]**/"
-            "trimx": "\\s*\\*[ ]?"
+            "trim": "RegExp::^\\s*\\*[ ]?"
             "output": "./test-doc.md"
         # allow some post-process to take place (shell scripting)
         - "process-shell":  #(list)
