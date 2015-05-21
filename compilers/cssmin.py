@@ -1634,7 +1634,7 @@ class Processor:
             explprefixes = expl[p]
             css = css.split( m.group(0) )
             prefixed = []
-            for pre in prefl:
+            for pre in prel:
                 prefix = prefixes[pre][0]
                 if prefix & explprefixes:
                     prefixed.append( m.group(2) + prefixes[pre][1] + ':' + m.group(5) + ';' )
