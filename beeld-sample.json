@@ -5,6 +5,7 @@
 },
 
 "plugins":[
+    {"minify": "!plg:minify"},
     {"doc": "!plg:doc"}
 ],
 

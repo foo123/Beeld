@@ -1,10 +1,10 @@
 <?php
-function beeld_plugin_doc($builder)
+function beeld_plugin_doc( $beelder )
 {
-    $builder->addAction('doc', 'beeld_plugin_action_doc');
+    $beelder->addAction('doc', 'beeld_plugin_action_doc');
 }
 
-function beeld_plugin_action_doc($evt)
+function beeld_plugin_action_doc( $evt )
 {
     $params =& $evt->data->data;
     $options =& $params->options;

@@ -5,7 +5,7 @@
 #   https://github.com/foo123/Beeld
 #
 #   A scriptable and configurable source code builder framework in Node/PHP/Python
-#   @version: 0.8-alpha
+#   @version: 0.8
 #
 ##
 
@@ -21,7 +21,6 @@ except ImportError:
 BEELD_ROOT = os.path.dirname(os.path.abspath(__file__))
 BEELD_INCLUDES = os.path.join(BEELD_ROOT, 'includes') + '/'
 BEELD_PARSERS = os.path.join(BEELD_INCLUDES, 'parsers') + '/'
-BEELD_COMPILERS = os.path.join(BEELD_ROOT, 'compilers') + '/'
 BEELD_TEMPLATES = os.path.join(BEELD_ROOT, 'templates') + '/'
 BEELD_PLUGINS = os.path.join(BEELD_ROOT, 'plugins') + '/'
 
@@ -169,39 +168,50 @@ def evaluate(xpr, data):
     return xpr.evaluate(data) if isinstance(xpr, Xpresion) else xpr
     
 
-def parseOptions( defaults ):
+def parse_options( defaults, required=None ):
     # parse args
     if ap:
-        parser = argparse.ArgumentParser(description="Build Source Code Packages (js/css)")
+        parser = argparse.ArgumentParser(description="Build Source Code Packages")
         parser.add_argument('--config', help="configuration file (REQUIRED)", metavar="FILE")
-        parser.add_argument('--tasks', help="specific tasks to run with commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
-        parser.add_argument('--compiler', help="source compiler to use (OPTIONAL) \nWhether to use uglifyjs, closure, \nyui, or cssmin compiler \nDEFAULT: uglifyjs", default=defaults['compiler'])
+        parser.add_argument('--tasks', help="specific tasks to run separated by commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
         parser.add_argument('--enc', help="set text encoding \nDEFAULT: utf-8", metavar="ENCODING", default=defaults['enc'])
-        options = parser.parse_args()
+        options, remainder = parser.parse_known_args()
 
     else:
-        parser = optparse.OptionParser(description='Build Source Code Packages (js/css)')
+        parser = optparse.OptionParser(description='Build Source Code Packages')
         parser.add_option('--config', help="configuration file (REQUIRED)", metavar="FILE")
-        parser.add_option('--tasks', dest='tasks', help="specific tasks to run with commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
-        parser.add_option('--compiler', dest='compiler', help="source compiler to use (OPTIONAL) \nWhether to use uglifyjs, closure, \nyui, or cssmin compiler \nDEFAULT: uglifyjs", default=defaults['compiler'])
+        parser.add_option('--tasks', dest='tasks', help="specific tasks to run separated by commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
         parser.add_option('--enc', dest='enc', help="set text encoding \nDEFAULT: utf-8", metavar="ENCODING", default=defaults['enc'])
         options, remainder = parser.parse_args()
 
+    is_valid = True
+    
+    # add dynamic (remainder) options
+    remlen = len(remainder)
+    i = 0
+    while i < remlen:
+        opt = remainder[i]
+        val = remainder[i+1]
+        i += 2
+        if opt.startswith('--'): opt = opt[2:]
+        setattr(options, opt, val)
+        
     # If no arguments have been passed, show the help message and exit
     if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit(1)
+        is_valid = False
     
-    # Ensure variable is defined
-    try:
-        options.config
-    except NameError:
-        options.config = None
+    # Ensure required options are defined
+    elif required:
+        for opt in required:
+            if not hasattr(options, opt) or not getattr(options, opt):
+                is_valid = False
+                break
 
     # If no dependencies have been passed, show the help message and exit
-    if None == options.config:
+    if not is_valid:
         parser.print_help()
         sys.exit(1)
+        return None
     
     return options
 
@@ -341,7 +351,6 @@ class BeeldActions:
         options.dispose()
         data.dispose()
         current.dispose()
-        params.compilers = None
         params.config = None
         params.options = None
         params.data = None
@@ -358,17 +367,12 @@ class BeeldActions:
         # output the build settings
         if not options.outputToStdOut:
             print (sepLine)
-            print (" Build Package ")
+            print ("Build Package")
             print (sepLine)
             print (" ")
             print ("Input    : " + options.inputType);
             print ("Encoding : " + options.encoding)
             print ("Task     : " + current.task)
-            if options.minify:
-                print ("Minify   : ON")
-                print ("Compiler : " + params.compilers[options.compiler].name)
-            else:
-                print ("Minify   : OFF")
             print ("Output   : " + options.out)
             print (" ")
         evt.next( )
@@ -383,7 +387,6 @@ class BeeldActions:
         options.dispose()
         data.dispose()
         current.dispose()
-        params.compilers = None
         params.config = None
         params.options = None
         params.data = None
@@ -440,11 +443,6 @@ class BeeldActions:
             
                 options.out = None
                 options.outputToStdOut = True
-            
-            if -1 < current.task_actions.hasItemByKey('minify'):
-                options.minify = True
-            else:
-                options.minify = False
             
             # default header action
             # is first file of src if exists
@@ -575,7 +573,6 @@ class BeeldActions:
                     cmd = multi_replace(params.process_list[params.process_list_index], [
                      ['${DIR}',          options.basePath]
                     ,['${CWD}',          options.cwd]
-                    ,['${COMPILERS}',    BEELD_COMPILERS]
                     ,['${TPLS}',         BEELD_TEMPLATES]
                     ,['${IN}',           data.tmp_in]
                     ,['${OUT}',          data.tmp_out]
@@ -606,73 +603,6 @@ class BeeldActions:
         else:
             evt.next( )
         
-    def action_minify(evt):
-        params = evt.data.data
-        options = params.options
-        data = params.data
-        current = params.current
-        minify = current.action_cfg
-        if minify and '' != data.src:
-            
-            if 'uglifyjs' in minify:
-                opts = minify['uglifyjs']
-                # convert to list/array if not so
-                if not isinstance(opts, list): opts = [opts]
-                params.compilers['uglifyjs'].option(" ".join(opts))
-                
-            if 'closure' in minify:
-                opts = minify['closure']
-                # convert to list/array if not so
-                if not isinstance(opts, list): opts = [opts]
-                params.compilers['closure'].option(" ".join(opts))
-                
-            if 'yui' in minify:
-                opts = minify['yui']
-                # convert to list/array if not so
-                if not isinstance(opts, list): opts = [opts]
-                params.compilers['yui'].option(" ".join(opts))
-            
-            if 'cssmin' in minify:
-                opts = minify['cssmin']
-                # convert to list/array if not so
-                if not isinstance(opts, list): opts = [opts]
-                params.compilers['cssmin'].option(" ".join(opts))
-            
-            write(data.tmp_in, data.src, options.encoding)
-
-            extra = ''
-            # use the selected compiler
-            compiler = params.compilers[options.compiler]
-            if 'cssmin'==options.compiler and "--basepath " not in compiler.options:
-                extra = "--basepath "+options.basePath
-            elif options.compiler in ['yui', 'closure']:
-                extra = "--charset "+options.encoding
-                    
-            cmd = compiler.compiler([
-             ['${COMPILERS}',    BEELD_COMPILERS]
-            ,['${EXTRA}',        extra]
-            ,['${OPTIONS}',      compiler.options]
-            ,['${IN}',           data.tmp_in]
-            ,['${OUT}',          data.tmp_out]
-            ])
-            err = os.system(cmd)
-            # on *nix systems this is a tuple, similar to the os.wait return result
-            # on windows it is an integer
-            # http://docs.python.org/2/library/os.html#process-management
-            # http://docs.python.org/2/library/os.html#os.wait
-            # high-byte is the exit status
-            if not (type(err) is int): err = 255 & (err[1]>>8)
-            
-            if 0==err: data.src = read(data.tmp_out, options.encoding)
-            
-            # some error occured
-            if 0!=err: 
-                data.err = 'Error executing "'+cmd+'"'
-                evt.abort()
-                return
-            
-        evt.next()
-
     def action_bundle(evt):
         params = evt.data.data
         options = params.options
@@ -763,7 +693,13 @@ Xpresion.defRuntimeFunc({
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
     
-    VERSION = "0.8-alpha"
+    VERSION = "0.8"
+    
+    ROOT      = BEELD_ROOT
+    INCLUDES  = BEELD_INCLUDES
+    PARSERS   = BEELD_PARSERS
+    TEMPLATES = BEELD_TEMPLATES
+    PLUGINS   = BEELD_PLUGINS
     
     def OrderedMap(om):
         return OrderedMap(om)
@@ -791,7 +727,6 @@ class Beeld(PublishSubscribe):
         ,'action_header': Beeld.Actions.action_header
         ,'action_replace': Beeld.Actions.action_replace
         ,'action_process-shell': Beeld.Actions.action_shellprocess
-        ,'action_minify': Beeld.Actions.action_minify
         ,'action_bundle': Beeld.Actions.action_bundle
         ,'action_out': Beeld.Actions.action_out
         }
@@ -822,44 +757,27 @@ class Beeld(PublishSubscribe):
                 else:
                     filename = get_real_path( filename, basePath )
                 loader = getattr(import_path(filename), 'beeld_plugin_' + plg[0])
-                loader( self, Beeld )
+                loader( self )
         
         return self
     
     # parse input arguments, options and configuration settings
     def parse(self):
         
+        #import pprint
+        
         params = Beeld.Obj()
         
-        options = parseOptions({
+        options = parse_options({
             'help' : False,
             'config' : False,
             'tasks' : False,
-            'compiler' : 'uglifyjs',
             'enc' : 'utf-8'
-        })
+        }, ['config'])
         
-        params.compilers = {
-        'cssmin': Beeld.Compiler(
-            'CSS Minifier',
-            'python ${COMPILERS}cssmin.py ${EXTRA} ${OPTIONS} --input ${IN}  --output ${OUT}'
-        ),
-        'uglifyjs': Beeld.Compiler(
-            'Node UglifyJS Compiler',
-            'uglifyjs ${IN} ${OPTIONS} -o ${OUT}'
-        ),
-        'closure': Beeld.Compiler(
-            'Java Closure Compiler',
-            'java -jar ${COMPILERS}closure.jar ${EXTRA} ${OPTIONS} --js ${IN} --js_output_file ${OUT}'
-        ),
-        'yui': Beeld.Compiler(
-            'Java YUI Compressor Compiler',
-            'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}'
-        )
-        }
-        # fix compiler selection
-        options.compiler = options.compiler.lower()
-        if options.compiler not in params.compilers: options.compiler = 'uglifyjs'
+        #pprint.pprint(options)
+        #sys.exit(0)
+        
         configFile = os.path.realpath(options.config)
         encoding = options.enc.lower()        
         ext = file_ext(configFile).lower()
@@ -869,7 +787,6 @@ class Beeld(PublishSubscribe):
         configurationFile = read(configFile, encoding)
         config = parser.parse(configurationFile)
         if not config: config = {}
-        #import pprint
         #pprint.pprint(config)
         #sys.exit(0)
         params.options = Beeld.Obj({
@@ -881,6 +798,7 @@ class Beeld(PublishSubscribe):
         'compiler': options.compiler,
         'tasks': options.tasks.split(',') if options.tasks else False
         })
+        params.cmd_opts = options
         params.data = Beeld.Obj()
         params.current = Beeld.Obj()
         

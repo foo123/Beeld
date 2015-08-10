@@ -1,12 +1,12 @@
 import re
 
 Beeld = None
-def beeld_plugin_doc(builder, BeeldClass):
+def beeld_plugin_doc( beelder ):
     global Beeld
-    Beeld = BeeldClass
-    builder.addAction('doc', beeld_plugin_action_doc)
+    Beeld = beelder.__class__ #BeeldClass
+    beelder.addAction('doc', beeld_plugin_action_doc)
     
-def beeld_plugin_action_doc(evt):
+def beeld_plugin_action_doc( evt ):
     global Beeld
     params = evt.data.data
     options = params.options

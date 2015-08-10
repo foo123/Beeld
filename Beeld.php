@@ -6,7 +6,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.8-alpha
+*   @version: 0.8
 *
 **/
 if (!class_exists('Beeld'))
@@ -17,7 +17,6 @@ define('BEELD_FILE', (isset($BEELD_FILE_INFO['extension']) ? $BEELD_FILE_INFO['f
 define('BEELD_ROOT', dirname(__FILE__) . DIRECTORY_SEPARATOR);
 define('BEELD_INCLUDES', BEELD_ROOT . 'includes' . DIRECTORY_SEPARATOR);
 define('BEELD_PARSERS', BEELD_INCLUDES . 'parsers' . DIRECTORY_SEPARATOR);
-define('BEELD_COMPILERS', BEELD_ROOT . 'compilers' . DIRECTORY_SEPARATOR);
 define('BEELD_TEMPLATES', BEELD_ROOT . 'templates' . DIRECTORY_SEPARATOR);
 define('BEELD_PLUGINS', BEELD_ROOT . 'plugins' . DIRECTORY_SEPARATOR);
 
@@ -206,7 +205,7 @@ final class BeeldUtils
      * @author              Patrick Fisher <patrick@pwfisher.com>
      * @see                 https://github.com/pwfisher/CommandLine.php
      */
-    public static function parseArgs($argv = null) 
+    public static function parse_args($argv = null) 
     {
         $argv = $argv ? $argv : $_SERVER['argv']; array_shift($argv); $o = array();
         for ($i = 0, $j = count($argv); $i < $j; $i++) 
@@ -236,31 +235,33 @@ final class BeeldUtils
         return $o;
     }
     
-    public static function showHelpMsg( )
+    public static function show_help_msg( )
     {
-        self::echo_("usage: ".BEELD_FILE." [-h] [--config FILE] [--tasks TASKS] [--compiler COMPILER] [--enc ENCODING]");
+        self::echo_("usage: ".BEELD_FILE." [-h] [--config FILE] [--tasks TASKS] [--enc ENCODING]");
         self::echo_(" ");
-        self::echo_("Build Source Code Packages (js/css)");
+        self::echo_("Build Source Code Packages");
         self::echo_(" ");
         self::echo_("optional arguments:");
         self::echo_("  -h, --help              show this help message and exit");
         self::echo_("  --config   FILE         configuration file (REQUIRED)");
-        self::echo_("  --tasks    TASKS        specific tasks to run with commas (OPTIONAL)");
+        self::echo_("  --tasks    TASKS        specific tasks to run separated by commas (OPTIONAL)");
         self::echo_("                          DEFAULT: all tasks defined in config file");
-        self::echo_("  --compiler COMPILER     source compiler to use (OPTIONAL)");
-        self::echo_("                          Whether to use uglifyjs, closure,");
-        self::echo_("                          yui, or cssmin compiler");
-        self::echo_("                          DEFAULT: uglifyjs");
         self::echo_("  --enc      ENCODING     set text encoding");
         self::echo_("                          DEFAULT: utf8");
         self::echo_(" ");
     }
     
-    public static function parseOptions( $defaults, $required, $showHelpMsg )
+    public static function parse_options( $defaults, $required, $on_error )
     {
-        $options = self::parseArgs( $_SERVER['argv'] );
-        $options = array_intersect_key($options, $defaults);
-        $options = array_merge($defaults, $options);
+        $options = self::parse_args( $_SERVER['argv'] );
+        if ( !empty($defaults) )
+        {
+            foreach((array)$defaults as $opt=>$default)
+            {
+                if ( !isset($options[$opt]) ) 
+                    $options[$opt] = $default;
+            }
+        }
         
         $is_valid = true;
         
@@ -268,7 +269,7 @@ final class BeeldUtils
         {
             $is_valid = false;
         }
-        else
+        elseif ( !empty($required) )
         {
             foreach ($required as $opt)
             {
@@ -283,8 +284,9 @@ final class BeeldUtils
         if ( !$is_valid )
         {
             // If no dependencies have been passed or help is set, show the help message and exit
-            call_user_func( $showHelpMsg );
+            call_user_func( $on_error );
             exit(1);
+            return null;
         }
         return $options;
     }
@@ -474,7 +476,6 @@ final class BeeldActions
         $options->dispose();
         $data->dispose();
         $current->dispose();
-        $params->compilers = null;
         $params->config = null;
         $params->options = null;
         $params->data = null;
@@ -494,7 +495,6 @@ final class BeeldActions
             $cmd = BeeldUtils::multi_replace($params->process_list[$params->process_list_index], array(
              array('${DIR}',        $options->basePath)
             ,array('${CWD}',        $options->cwd)
-            ,array('${COMPILERS}',  BEELD_COMPILERS)
             ,array('${TPLS}',       BEELD_TEMPLATES)
             ,array('${IN}',         $data->tmp_in)
             ,array('${OUT}',        $data->tmp_out)
@@ -535,21 +535,12 @@ final class BeeldActions
         if ( !$options->outputToStdOut )
         {
             BeeldUtils::echo_($sepLine);
-            BeeldUtils::echo_(" Build Package ");
+            BeeldUtils::echo_("Build Package");
             BeeldUtils::echo_($sepLine);
             BeeldUtils::echo_(" ");
             BeeldUtils::echo_("Input    : " . $options->inputType);
             BeeldUtils::echo_("Encoding : " . $options->encoding);
             BeeldUtils::echo_("Task     : " . $current->task);
-            if ( $options->minify )
-            {
-                BeeldUtils::echo_("Minify   : ON");
-                BeeldUtils::echo_("Compiler : " . $params->compilers[$options->compiler]->name);
-            }
-            else
-            {
-                BeeldUtils::echo_("Minify   : OFF");
-            }
             BeeldUtils::echo_("Output   : " . $options->out);
             BeeldUtils::echo_(" ");
         }
@@ -566,7 +557,6 @@ final class BeeldActions
         $options->dispose();
         $data->dispose();
         $current->dispose();
-        $params->compilers = null;
         $params->config = null;
         $params->options = null;
         $params->data = null;
@@ -632,14 +622,6 @@ final class BeeldActions
             {
                 $options->out = null;
                 $options->outputToStdOut = true;
-            }
-            if ( -1 < $current->task_actions->hasItemByKey('minify') )
-            {
-                $options->minify = true;
-            }
-            else
-            {
-                $options->minify = false;
             }
             
             // default header action
@@ -802,67 +784,6 @@ final class BeeldActions
         }
     }
     
-    public static function action_minify($evt)
-    {
-        $params =& $evt->data->data;
-        $options =& $params->options;
-        $data =& $params->data;
-        $current =& $params->current;
-        $minify = $current->action_cfg;
-        if ( $minify && !empty($data->src) )
-        {
-            $minify = (array)$minify;
-            
-            if (isset($minify['uglifyjs']))
-                $params->compilers['uglifyjs']->option(implode(" ", (array)$minify['uglifyjs']));
-            if (isset($minify['closure']))
-                $params->compilers['closure']->option(implode(" ", (array)$minify['closure']));
-            if (isset($minify['yui']))
-                $params->compilers['yui']->option(implode(" ", (array)$minify['yui']));
-            if (isset($minify['cssmin']))
-                $params->compilers['cssmin']->option(implode(" ", (array)$minify['cssmin']));
-            
-            BeeldUtils::write($data->tmp_in, $data->src);
-            
-            $extra = '';
-            // use the selected compiler
-            $compiler = $params->compilers[$options->compiler];
-            if ('cssmin' === $options->compiler && false === strpos($compiler->options, "--basepath"))
-            {
-                $extra = "--basepath=".$options->basePath;
-            }
-            elseif ('yui' === $options->compiler || 'closure' === $options->compiler)
-            {
-                $extra = "--charset ".$options->encoding;
-            }
-            
-            $cmd = $compiler->compiler(array(
-             array('${COMPILERS}',       BEELD_COMPILERS)
-            ,array('${EXTRA}',           $extra)
-            ,array('${OPTIONS}',         $compiler->options)
-            ,array('${IN}',              $data->tmp_in)
-            ,array('${OUT}',             $data->tmp_out)
-            ));
-            
-            //$cmd = escapeshellcmd( $cmd );
-            exec($cmd . ' 2>&1', $out=array(), $err=0);
-            
-            // some error occured
-            if ( $err ) 
-            {
-                $data->err = 'Error executing "'.$cmd.'"';
-                BeeldUtils::echo_stderr(implode(PHP_EOL, (array)$out));
-                $evt->abort( );
-                return;
-            }
-            else
-            {
-                $data->src = BeeldUtils::read($data->tmp_out);
-            }
-        }
-        $evt->next( );
-    }
-    
     public static function action_bundle($evt)
     {
         $params =& $evt->data->data;
@@ -921,7 +842,7 @@ final class BeeldActions
 // extends/implements PublishSubscribe
 class Beeld extends PublishSubscribe
 {
-    const VERSION = "0.8-alpha";
+    const VERSION = "0.8";
     public static $Parsers = null;
     
     public $actions = null;
@@ -997,7 +918,6 @@ class Beeld extends PublishSubscribe
         ,'action_header'=> array('BeeldActions', 'action_header')
         ,'action_replace'=> array('BeeldActions', 'action_replace')
         ,'action_process-shell'=> array('BeeldActions', 'action_shellprocess')
-        ,'action_minify'=> array('BeeldActions', 'action_minify')
         ,'action_bundle'=> array('BeeldActions', 'action_bundle')
         ,'action_out'=> array('BeeldActions', 'action_out')
         );
@@ -1050,36 +970,17 @@ class Beeld extends PublishSubscribe
     public function &parse( )
     {
         $params = Beeld::Obj();
-        $options = BeeldUtils::parseOptions(array(
+        $options = BeeldUtils::parse_options(array(
             'h' => false,
             'help' => false,
             'config' => false,
             'tasks' => false,
-            'compiler' => 'uglifyjs',
             'enc' => 'utf8'
-        ), array('config'), array('BeeldUtils', 'showHelpMsg'));
+        ), array('config'), array('BeeldUtils', 'show_help_msg'));
         
-        $params->compilers = array(
-        'cssmin' => Beeld::Compiler(
-            'CSS Minifier',
-            'php -f ${COMPILERS}cssmin.php -- ${EXTRA} ${OPTIONS} --input=${IN}  --output=${OUT}'
-        ),
-        'uglifyjs' => Beeld::Compiler(
-            'Node UglifyJS Compiler',
-            'uglifyjs ${IN} ${OPTIONS} -o ${OUT}'
-        ),
-        'closure' => Beeld::Compiler(
-            'Java Closure Compiler',
-            'java -jar ${COMPILERS}closure.jar ${EXTRA} ${OPTIONS} --js ${IN} --js_output_file ${OUT}'
-        ),
-        'yui' => Beeld::Compiler(
-            'Java YUI Compressor Compiler',
-            'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}'
-        )
-        );
-        // fix compiler selection
-        $options['compiler'] = strtolower(strval($options['compiler']));
-        if ( !isset($params->compilers[ $options['compiler'] ]) ) $options['compiler'] = 'uglifyjs';
+        //print_r($options);
+        //exit(0);
+        
         $configFile = realpath($options['config']);
         $encoding = strtolower($options['enc']);
         // parse settings
@@ -1100,6 +1001,7 @@ class Beeld extends PublishSubscribe
         'compiler'=> $options['compiler'],
         'tasks'=> (isset($options['tasks']) && $options['tasks'] ? explode(',', $options['tasks']) : false)
         ));
+        $params->cmd_opts = $options;
         $params->data = Beeld::Obj();
         $params->current = Beeld::Obj();
         

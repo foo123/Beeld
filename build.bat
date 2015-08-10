@@ -16,4 +16,4 @@ rem to use the php build tool do:
 rem php -f Beeld.php -- --config="beeld-sample.yml" --compiler=closure
 
 rem to use the node build tool do:
-node Beeld.js --config "beeld-sample.config" --compiler unglifyjs
+node Beeld.js --config "beeld-sample.config" --compiler uglifyjs

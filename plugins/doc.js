@@ -2,8 +2,9 @@
 
 module.exports = {
     
-    beeld_plugin_doc: function( builder, Beeld ) {
-        var HAS = 'hasOwnProperty', 
+    beeld_plugin_doc: function( beelder ) {
+        var Beeld = beelder.constructor,
+            HAS = 'hasOwnProperty', 
             write_async = Beeld.Utils.write_async,
             get_real_path = Beeld.Utils.get_real_path,
             regex = Beeld.Utils.regex,
@@ -82,6 +83,6 @@ module.exports = {
             evt.next( );
         };
         
-        builder.addAction('doc', action_doc);
+        beelder.addAction('doc', action_doc);
     }
 };
