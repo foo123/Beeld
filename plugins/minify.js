@@ -7,6 +7,7 @@ module.exports = {
             HAS = 'hasOwnProperty', exec_async = require('child_process').exec,
             write_async = Beeld.Utils.write_async,
             read_async = Beeld.Utils.read_async,
+            echo_stderr = console.error,
             BEELD_COMPILERS = Beeld.Utils.join_path(Beeld.ROOT, "compilers") + '/'
         ;
         var action_minify = function action_minify( evt ) {
