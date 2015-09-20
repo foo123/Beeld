@@ -1,4 +1,4 @@
-    /* main code ends here */
-    
-    exports.action = function () {};
+/* main code ends here */
+
+exports.action = function () {};
 }));

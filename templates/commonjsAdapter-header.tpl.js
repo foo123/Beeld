@@ -16,7 +16,7 @@ if (typeof exports === 'object' && typeof define !== 'function') {
 }
 
 define(function (require, exports, module) {
-    var b = require('b');
+var b = require('b');
 
-        /* main code starts here */
+/* main code starts here */
 

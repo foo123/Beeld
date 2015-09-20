@@ -1,4 +1,4 @@
-    /* main code ends here */
-    
-    return function () {};
+/* main code ends here */
+
+return function () {};
 });

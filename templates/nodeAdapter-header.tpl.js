@@ -16,8 +16,8 @@ if (typeof module === 'object' && typeof define !== 'function') {
 }
 
 define(function (require, exports, module) {
-    "use strict";
-    var b = require('b');
+"use strict";
+var b = require('b');
 
-        /* main code starts here */
+/* main code starts here */
 

@@ -16,21 +16,21 @@
 // in the browser, it will create a global .b that is used below.
 
 (function (root, factory) {
-    "use strict";
-    if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define(['b'], function (b) {
-            // Also create a global in case some scripts
-            // that are loaded still are looking for
-            // a global even when an AMD loader is in use.
-            return (root.amdWebGlobal = factory(b));
-        });
-    } else {
-        // Browser globals
-        root.amdWebGlobal = factory(root.b);
-    }
+"use strict";
+if (typeof define === 'function' && define.amd) {
+    // AMD. Register as an anonymous module.
+    define(['b'], function (b) {
+        // Also create a global in case some scripts
+        // that are loaded still are looking for
+        // a global even when an AMD loader is in use.
+        return (root.amdWebGlobal = factory(b));
+    });
+} else {
+    // Browser globals
+    root.amdWebGlobal = factory(root.b);
+}
 }(this, function (b) {
-    //use b in some fashion.
+//use b in some fashion.
 
-        /* main code starts here */
+/* main code starts here */
 

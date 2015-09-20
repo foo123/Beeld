@@ -9,6 +9,6 @@ if(typeof define !== 'function') {
 /* Work in progress */
 define(['jQuery'], function($){
 
-    "use strict";
-        /* main code starts here */
+"use strict";
+/* main code starts here */
 

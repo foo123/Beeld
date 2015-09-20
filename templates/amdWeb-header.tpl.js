@@ -25,7 +25,7 @@
         root.amdWeb = factory(root.b);
     }
 }(this, function (b) {
-    //use b in some fashion.
+//use b in some fashion.
 
-        /* main code starts here */
+/* main code starts here */
 

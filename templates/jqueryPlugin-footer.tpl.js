@@ -1,4 +1,4 @@
-    /* main code ends here */
-    
-    $.fn.jqueryPlugin = function () {};
+/* main code ends here */
+
+$.fn.jqueryPlugin = function () {};
 }));
