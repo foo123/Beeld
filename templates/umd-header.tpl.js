@@ -1,10 +1,5 @@
 !function ( root, name, deps, factory ) {
 "use strict";
-
-//
-// export the module umd-style (with deps bundled-in or external)
-
-// Get current filename/path
 function getPath( isNode, isWebWorker, isAMD, isBrowser, amdMod ) 
 {
     var f;
@@ -25,7 +20,6 @@ function getDeps( names, paths, deps, depsType, require/*offset*/ )
             ;
     return mods;
 }
-// load javascript(s) (a)sync using <script> tags if browser, or importScripts if worker
 function loadScripts( scope, base, names, paths, callback, imported )
 {
     var dl = names.length, i, rel, t, load, next, head, link;
@@ -71,9 +65,7 @@ function loadScripts( scope, base, names, paths, callback, imported )
     if ( i < dl ) load( paths[ i ], next );
     else callback( );
 }
-
 deps = deps || [[],[]];
-
 var isNode = ("undefined" !== typeof global) && ("[object global]" === {}.toString.call(global)),
     isBrowser = !isNode && ("undefined" !== typeof navigator), 
     isWebWorker = !isNode && ("function" === typeof importScripts) && (navigator instanceof WorkerNavigator),
@@ -82,15 +74,11 @@ var isNode = ("undefined" !== typeof global) && ("[object global]" === {}.toStri
     currentGlobal = isWebWorker ? self : root, currentPath = getPath( isNode, isWebWorker, isAMD, isBrowser ), m,
     names = [].concat(deps[0]), paths = [].concat(deps[1]), dl = names.length, i, requireJSPath, ext_js = /\.js$/i
 ;
-
-// commonjs, node, etc..
 if ( isCommonJS ) 
 {
     module.$deps = module.$deps || {};
     module.exports = module.$deps[ name ] = factory.apply( root, [{NODE:module}].concat(getDeps( names, paths, module.$deps, 1, require )) ) || 1;
 }
-
-// amd, requirejs, etc..
 else if ( isAMD && ("function" === typeof require) && ("function" === typeof require.specified) &&
     require.specified(name) ) 
 {
@@ -107,8 +95,6 @@ else if ( isAMD && ("function" === typeof require) && ("function" === typeof req
         });
     }
 }
-
-// browser, web worker, other loaders, etc.. + AMD optional
 else if ( !(name in currentGlobal) )
 {
     loadScripts( currentGlobal, currentPath.path + '/', names, paths, function( ){ 
@@ -116,11 +102,9 @@ else if ( !(name in currentGlobal) )
         isAMD && define( name, ["require"], function( ){ return m; } );
     }, isWebWorker);
 }
-
 }(  /* current root */          @@ROOT@@, 
     /* module name */           "@@MODULE_NAME@@",
     /* module dependencies */   @@MODULE_DEPENDENCIES@@, 
     /* module factory */        function( @@EXPORTS@@, @@MODULE_ARGUMENTS@@ ) {
-    
 /* main code starts here */
 
