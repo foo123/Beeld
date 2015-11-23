@@ -103,7 +103,7 @@ else if ( !(name in currentGlobal) )
 {
     loadScripts( currentGlobal, currentPath.path + '/', names, paths, function( ){ 
         m = factory.apply( root, [{}].concat(getDeps( names, paths, currentGlobal )) ); 
-        isAMD && define( name, ["require"], function( ){ return m; } );
+        isAMD && define( function( ){ return m; } );
     }, isWebWorker);
 }
 }(  /* current root */          @@ROOT@@, 

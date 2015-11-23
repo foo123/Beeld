@@ -8,7 +8,7 @@ if ( isCommonJS )
 else if ( isAMD && ("function" === typeof(require)) && ("function" === typeof(require.specified)) && require.specified(name) ) 
     define( name, ['require', 'exports', 'module'], function( require, exports, module ){ return factory.call( root, {AMD:module} ); } );
 else if ( !(name in root) ) 
-    (root[ name ] = (m=factory.call( root, {} ) || 1)) && isAMD && define( name, [], function( ){ return m; } );
+    (root[ name ] = (m=factory.call( root, {} ) || 1)) && isAMD && define( function( ){ return m; } );
 }(  /* current root */          @@ROOT@@, 
     /* module name */           "@@MODULE_NAME@@",
     /* module factory */        function( @@EXPORTS@@ ) {

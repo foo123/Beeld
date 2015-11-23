@@ -1,6 +1,6 @@
 !function( root, name, factory ) {
 "use strict";
-var isXPCOM = ("undefined" !== typeof Components) && Components.utils && ("function" === typeof Components.utils['import']),
+var isXPCOM = ("undefined" !== typeof Components) && ("object" === typeof Components.classes) && ("object" === typeof Components.classesByID) && Components.utils && ("function" === typeof Components.utils['import']),
     isCommonJS = ("object" === typeof module) && module.exports,
     isAMD = ("function" === typeof(define)) && define.amd, m;
 
@@ -19,7 +19,7 @@ else if ( isAMD && ("function" === typeof(require)) && ("function" === typeof(re
 }
 else if ( !(name in root) )
 {
-    (root[ name ] = (m=factory.call( root, {} ) || 1)) && isAMD && define( name, [], function( ){ return m; } );
+    (root[ name ] = (m=factory.call( root, {} ) || 1)) && isAMD && define( function( ){ return m; } );
 }
 }(  /* current root */          @@ROOT@@, 
     /* module name */           "@@MODULE_NAME@@",
