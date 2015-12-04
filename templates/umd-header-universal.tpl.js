@@ -1,7 +1,9 @@
 !function( root, name, factory ) {
 "use strict";
 var m;
-if ( ('object'===typeof module)&&module.exports ) /* CommonJS */
+if ( ('undefined'!==typeof Components)&&('object'===typeof Components.classes)&&('object'===typeof Components.classesByID)&&Components.utils&&('function'===typeof Components.utils['import']) ) /* XPCOM */
+    (root.EXPORTED_SYMBOLS = [name]) && (root[name] = factory.call(root,{}));
+else if ( ('object'===typeof module)&&module.exports ) /* CommonJS */
     module.exports = factory.call( root, {} );
 else if ( ('undefined'!==typeof System)&&('function'===typeof System.register)&&('function'===typeof System['import']) ) /* ES6 module */
     System.register(name,[],function($__export){$__export(name, factory.call(root,{}));});

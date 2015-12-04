@@ -1748,9 +1748,9 @@ Processor.prototype = {
         var comment_start = css.indexOf ("/*" ), comment_end;
         while (comment_start > -1)
         {
-            // Preserve comments that look like `/*!...*/`.
+            // Preserve comments that look like `/*!...*/` or `/**...*/`.
             // Slicing is used to make sure we don"t get an IndexError.
-            preserve = (css[comment_start + 2] /*$comment_start + 3*/ == "!");
+            preserve = (css[comment_start + 2] /*$comment_start + 3*/ == "!")||(css[comment_start + 2] /*$comment_start + 3*/ == "*");
             
             comment_end = css.indexOf( "*/", comment_start + 2 );
             if (comment_end<0)
