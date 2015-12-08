@@ -539,7 +539,7 @@ class CSSMin
         {
             // Preserve comments that look like `/*!...*/` or `/**...*/`.
             // Slicing is used to make sure we don"t get an IndexError.
-            $preserve = (bool)($css[$comment_start + 2] /*$comment_start + 3*/ == "!" || $css[$comment_start + 2] /*$comment_start + 3*/ == "*");
+            $preserve = false;//(bool)($css[$comment_start + 2] /*$comment_start + 3*/ == "!" || $css[$comment_start + 2] /*$comment_start + 3*/ == "*");
             
             $comment_end = strpos($css, "*/", $comment_start + 2);
             if (false===$comment_end)
