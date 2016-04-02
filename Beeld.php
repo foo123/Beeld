@@ -5,8 +5,8 @@
 *   Beeld
 *   https://github.com/foo123/Beeld
 *
-*   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.8
+*   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
+*   @version: 0.8.1
 *
 **/
 if (!class_exists('Beeld'))
@@ -22,6 +22,7 @@ define('BEELD_PLUGINS', BEELD_ROOT . 'plugins' . DIRECTORY_SEPARATOR);
 
 require(BEELD_INCLUDES . 'PublishSubscribe.php');
 require(BEELD_INCLUDES . 'Xpresion.php');
+//require(BEELD_INCLUDES . 'Contemplate.php');
 
 //
 // beeld utils
@@ -842,7 +843,7 @@ final class BeeldActions
 // extends/implements PublishSubscribe
 class Beeld extends PublishSubscribe
 {
-    const VERSION = "0.8";
+    const VERSION = "0.8.1";
     public static $Parsers = null;
     
     public $actions = null;
@@ -932,6 +933,11 @@ class Beeld extends PublishSubscribe
     {
         $this->disposePubSub();
         $this->actions = null;
+    }
+    
+    public function getClass( )
+    {
+        return Beeld; // "Beeld"
     }
     
     public function addAction( $action, $handler ) 

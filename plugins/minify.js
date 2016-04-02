@@ -3,7 +3,7 @@
 module.exports = {
     
     beeld_plugin_minify: function( beelder ) {
-        var Beeld = beelder.constructor,
+        var Beeld = beelder.getClass(),
             HAS = 'hasOwnProperty', exec_async = require('child_process').exec,
             write_async = Beeld.Utils.write_async,
             read_async = Beeld.Utils.read_async,

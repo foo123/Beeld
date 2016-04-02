@@ -4,13 +4,13 @@
 *   Beeld
 *   https://github.com/foo123/Beeld
 *
-*   A scriptable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.8
+*   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
+*   @version: 0.8.1
 *
 **/
-!function (root, moduleName, moduleDefinition) {
+!function (root, name, factory) {
     // node, CommonJS, etc..
-    if ( 'object' == typeof(module) && module.exports ) module.exports = moduleDefinition();
+    if ( 'object' == typeof(module) && module.exports ) module.exports = factory();
 }(this, 'Beeld', function( undef ) {
 "use strict";
 var PROTO = 'prototype', HAS = 'hasOwnProperty',
@@ -96,7 +96,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty',
     
     // needed variables
     BEELD_FILE, BEELD_ROOT, BEELD_INCLUDES, BEELD_PARSERS, BEELD_TEMPLATES, BEELD_PLUGINS,
-    TPLS = { }, PublishSubscribe, Xpresion, /*List, Map,*/ OrderedMap, 
+    TPLS = { }, PublishSubscribe, Xpresion, Contemplate, /*List, Map,*/ OrderedMap, 
     BeeldParser, BeeldCompiler, Beeld
 ; 
 
@@ -109,6 +109,7 @@ BEELD_PLUGINS = join_path(BEELD_ROOT, "plugins") + '/';
 
 PublishSubscribe = require(BEELD_INCLUDES + 'PublishSubscribe.js');
 Xpresion = require(BEELD_INCLUDES + 'Xpresion.js');
+//Contemplate = require(BEELD_INCLUDES + 'Contemplate.js');
 
 //List = Array;
 //Map = Object;
@@ -449,7 +450,7 @@ Beeld = function Beeld( ) {
     ,'action_out': Beeld.Actions.action_out
     };
 };
-Beeld.VERSION = "0.8";
+Beeld.VERSION = "0.8.1";
 Beeld.FILE      = BEELD_FILE;
 Beeld.ROOT      = BEELD_ROOT;
 Beeld.INCLUDES  = BEELD_INCLUDES;
@@ -903,6 +904,8 @@ Beeld[PROTO].dispose = function( ) {
     self.actions = null;
     return self;
 };
+
+Beeld[PROTO].getClass = function( ){ return Beeld; };
 
 Beeld[PROTO].addAction = function( action, handler ) {
     if ( action && 'function'===typeof handler )

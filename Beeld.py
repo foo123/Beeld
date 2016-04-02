@@ -4,8 +4,8 @@
 #   Beeld
 #   https://github.com/foo123/Beeld
 #
-#   A scriptable and configurable source code builder framework in Node/PHP/Python
-#   @version: 0.8
+#   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
+#   @version: 0.8.1
 #
 ##
 
@@ -26,6 +26,7 @@ BEELD_PLUGINS = os.path.join(BEELD_ROOT, 'plugins') + '/'
 
 from includes.PublishSubscribe import PublishSubscribe
 from includes.Xpresion import Xpresion
+#from includes.Contemplate import Contemplate
 
 #
 # beeld utils
@@ -693,7 +694,7 @@ Xpresion.defRuntimeFunc({
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
     
-    VERSION = "0.8"
+    VERSION = "0.8.1"
     
     ROOT      = BEELD_ROOT
     INCLUDES  = BEELD_INCLUDES
@@ -739,6 +740,9 @@ class Beeld(PublishSubscribe):
         self.actions = None
         return self
         
+    def getClass(self):
+        return Beeld
+    
     def addAction(self, action, handler):
         if action and callable(handler):
             self.actions['action_'+action] = handler

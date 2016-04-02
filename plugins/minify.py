@@ -6,7 +6,7 @@ BEELD_COMPILERS = None
 def beeld_plugin_minify( beelder ):
     global Beeld
     global BEELD_COMPILERS
-    Beeld = beelder.__class__ #BeeldClass
+    Beeld = beelder.getClass() #BeeldClass
     if BEELD_COMPILERS is None:
         BEELD_COMPILERS = os.path.join(Beeld.ROOT, 'compilers') + '/'
     beelder.addAction('minify', beeld_plugin_action_minify)

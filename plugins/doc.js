@@ -3,7 +3,7 @@
 module.exports = {
     
     beeld_plugin_doc: function( beelder ) {
-        var Beeld = beelder.constructor,
+        var Beeld = beelder.getClass(),
             HAS = 'hasOwnProperty', 
             write_async = Beeld.Utils.write_async,
             get_real_path = Beeld.Utils.get_real_path,

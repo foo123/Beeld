@@ -3,7 +3,7 @@ import re
 Beeld = None
 def beeld_plugin_doc( beelder ):
     global Beeld
-    Beeld = beelder.__class__ #BeeldClass
+    Beeld = beelder.getClass() #BeeldClass
     beelder.addAction('doc', beeld_plugin_action_doc)
     
 def beeld_plugin_action_doc( evt ):
