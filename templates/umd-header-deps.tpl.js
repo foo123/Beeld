@@ -1,17 +1,14 @@
-!function( root, name, deps, factory ) {
+!function( root, name, factory ){
 "use strict";
-var m = factory.call(root,{}); m.$dependencies = deps||[];
-if ( ('object'===typeof module)&&module.exports ) /* CommonJS */
-    module.exports = m;
-else if ( ('undefined'!==typeof System)&&('function'===typeof System.register)&&('function'===typeof System['import']) ) /* ES6 module */
-    System.register(name,[],function($__export){$__export(name, m);});
-else if ( ('function'===typeof define)&&define.amd&&('function'===typeof require)&&('function'===typeof require.specified)&&require.specified(name) ) /* AMD */
-    define(name,['require','exports','module'],function(){return m;});
+function extract(obj,keys,index,load){return obj ? keys.map(function(k, i){return (index ? obj[i] : obj[k]) || (load?load(k):null); }) : [];}
+if ( ('object'===typeof module) && module.exports ) /* CommonJS */
+    (module.$deps = module.$deps||{}) && (module.exports = module.$deps[name] = factory.apply(root, extract(module.$deps,[@@DEPNAMES@@],false,function(k){return require("./"+k.toLowerCase());})));
+else if ( ('function'===typeof define)&&define.amd&&('function'===typeof require)&&('function'===typeof require.specified)&&require.specified(name) /*&& !require.defined(name)*/ ) /* AMD */
+    define(name,['module'].concat([@@DEPNAMES@@]),function(module){factory.moduleUri = module.uri; return factory.apply(root, extract(Array.prototype.slice.call(arguments,1),[@@DEPNAMES@@],true));});
 else if ( !(name in root) ) /* Browser/WebWorker/.. */
-    (root[ name ] = m)&&('function'===typeof(define))&&define.amd&&define(function(){return m;} );
+    (root[name]=factory.apply(root, extract(root,[@@DEPNAMES@@])))&&('function'===typeof(define))&&define.amd&&define(function(){return root[name];} );
 }(  /* current root */          @@ROOT@@, 
-    /* module name */           "@@MODULE_NAME@@",
-    /* module deps */           @@MODULE_DEPS@@,
-    /* module factory */        function( @@EXPORTS@@ ) {
+    /* module name */           "@@MODULE@@",
+    /* module factory */        function ModuleFactory__@@MODULE@@( @@DEPS@@ ){
 /* main code starts here */
 

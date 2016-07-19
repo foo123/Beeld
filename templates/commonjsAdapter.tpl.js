@@ -18,5 +18,13 @@ if (typeof exports === 'object' && typeof define !== 'function') {
 define(function (require, exports, module) {
 var b = require('b');
 
+
 /* main code starts here */
+<% $src %>
+/* main code ends here */
+
+// Only attach properties to the exports object to define
+// the module's properties.
+exports.action = function () {};
+});
 

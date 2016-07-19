@@ -33,4 +33,9 @@ if (typeof define === 'function' && define.amd) {
 //use b in some fashion.
 
 /* main code starts here */
+<% $src %>
+/* main code ends here */
+
+return {};
+}));
 

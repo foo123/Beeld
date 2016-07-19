@@ -28,4 +28,8 @@
 //use b in some fashion.
 
 /* main code starts here */
+<% $src %>
+/* main code ends here */
 
+return {};
+}));
