@@ -30,7 +30,7 @@ module.exports = {
                 )
                 },
                 selected,
-                params = evt.data.data, 
+                params = evt.data, 
                 options = params.options, 
                 data = params.data, 
                 current = params.current,

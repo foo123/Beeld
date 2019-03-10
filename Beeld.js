@@ -5,13 +5,13 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.8.1
+*   @version: 0.9.0
 *
 **/
 !function (root, name, factory) {
     // node, CommonJS, etc..
     if ( 'object' == typeof(module) && module.exports ) module.exports = factory();
-}(this, 'Beeld', function( undef ) {
+}('undefined' !== typeof self ? self : this, 'Beeld', function( undef ) {
 "use strict";
 var PROTO = 'prototype', HAS = 'hasOwnProperty',
     // basic modules
@@ -187,7 +187,7 @@ function multi_replace( tpl, reps )
 
 function regex( rex, evt )
 {
-    var settings = evt.data.data.config.settings;
+    var settings = evt.data.config.settings;
     if (rex instanceof RegExp) return rex;
     else if (settings.RegExp && rex.substr && startsWith(rex, settings.RegExp)) return new RegExp(rex.substr(settings.RegExp.length));
     return false;
@@ -195,7 +195,7 @@ function regex( rex, evt )
 
 function xpresion( xpr, evt ) 
 {
-    var settings = evt.data.data.config.settings;
+    var settings = evt.data.config.settings;
     if ( settings.Xpresion )
     {
         if ( xpr instanceof Xpresion ) 
@@ -450,7 +450,7 @@ Beeld = function Beeld( ) {
     ,'action_out': Beeld.Actions.action_out
     };
 };
-Beeld.VERSION = "0.8.1";
+Beeld.VERSION = "0.9.0";
 Beeld.FILE      = BEELD_FILE;
 Beeld.ROOT      = BEELD_ROOT;
 Beeld.INCLUDES  = BEELD_INCLUDES;
@@ -527,7 +527,7 @@ Xpresion.defRuntimeFunc({
 Beeld.Actions = {
  
  abort: function( evt, params ) {
-    if ( evt && !params) params = evt.data.data;
+    if ( evt && !params) params = evt.data;
     var config = params.config, 
         options = params.options, 
         data = params.data, 
@@ -545,7 +545,7 @@ Beeld.Actions = {
     exit( 1 );
 }
 ,log: function( evt ) {
-    var params = evt.data.data,
+    var params = evt.data,
         options = params.options, 
         data = params.data, 
         current = params.current,
@@ -566,7 +566,7 @@ Beeld.Actions = {
     evt.next( );
 }
 ,finish: function( evt ) { 
-    var params = evt.data.data,
+    var params = evt.data,
         options = params.options, 
         data = params.data, 
         current = params.current;
@@ -582,7 +582,7 @@ Beeld.Actions = {
     evt.dispose();
 }
 ,next_action: function( evt ) {
-    var params = evt.data.data,
+    var params = evt.data,
         current = params.current,
         task_actions = current.task_actions;
     if ( task_actions && task_actions.hasNext() )
@@ -606,7 +606,7 @@ Beeld.Actions = {
     }
 }
 ,next_task: function next_task( evt ) {
-    var params = evt.data.data,
+    var params = evt.data,
         options = params.options, 
         data = params.data, 
         current = params.current,
@@ -678,7 +678,7 @@ Beeld.Actions = {
 }*/
 
 ,action_src: function( evt ) {
-    var params = evt.data.data, 
+    var params = evt.data, 
         options = params.options, 
         data = params.data, 
         current = params.current,
@@ -719,7 +719,7 @@ Beeld.Actions = {
     evt.next( );
 }
 ,action_header: function( evt ) {
-    var params = evt.data.data, 
+    var params = evt.data, 
         options = params.options, 
         data = params.data, 
         current = params.current,
@@ -742,7 +742,7 @@ Beeld.Actions = {
     evt.next( );
 }
 ,action_replace: function( evt ) {
-    var params = evt.data.data, 
+    var params = evt.data, 
         //options = params.options, 
         data = params.data, 
         current = params.current;
@@ -765,7 +765,7 @@ Beeld.Actions = {
     evt.next( );
 }
 ,action_shellprocess: function( evt ) { 
-    var params = evt.data.data, 
+    var params = evt.data, 
         options = params.options, 
         data = params.data, 
         current = params.current,
@@ -832,7 +832,7 @@ Beeld.Actions = {
     }
 }
 ,action_bundle: function( evt ) {
-    var params = evt.data.data, 
+    var params = evt.data, 
         options = params.options, 
         data = params.data, 
         current = params.current,
@@ -865,7 +865,7 @@ Beeld.Actions = {
     evt.next( );
 }
 ,action_out: function( evt ) {
-    var params = evt.data.data, 
+    var params = evt.data, 
         options = params.options, 
         data = params.data, 
         //current = params.current,

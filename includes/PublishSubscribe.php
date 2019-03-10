@@ -3,11 +3,11 @@
 *  PublishSubscribe
 *  A simple publish-subscribe implementation for PHP, Python, Node/JS
 *
-*  @version: 0.4.1
+*  @version: 1.1.0
 *  https://github.com/foo123/PublishSubscribe
 *
 **/
-if ( !class_exists('PublishSubscribe') )
+if ( !class_exists('PublishSubscribe', false) )
 {
 
 interface PublishSubscribeInterface
@@ -59,11 +59,11 @@ class PublishSubscribeEvent
     public $namespaces = null;
     public $data = null;
     public $timestamp = 0;
-    private $_propagates = true;
-    private $_stopped = false;
-    private $_aborted = false;
+    protected $_propagates = true;
+    protected $_stopped = false;
+    protected $_aborted = false;
     public $is_pipelined = false;
-    private $_next = null;
+    protected $_next = null;
     
     public function __construct(&$target=null, $topic=null, $original=null, $tags=null, $namespaces=null)
     {
@@ -76,7 +76,7 @@ class PublishSubscribeEvent
         else $this->tags = array();
         if ( $namespaces )  $this->namespaces = (array)$namespaces;
         else  $this->namespaces = array();
-        $this->data = new PublishSubscribeData();
+        $this->data = null;//new PublishSubscribeData();
         $this->timestamp = round(microtime(true) * 1000);
         $this->_propagates = true;
         $this->_stopped = false;
@@ -163,7 +163,7 @@ class PublishSubscribeEvent
 
 class PublishSubscribe implements PublishSubscribeInterface
 {
-    const VERSION = "0.4.1";
+    const VERSION = "1.1.0";
     const TOPIC_SEP = '/';
     const TAG_SEP = '#';
     const NS_SEP = '@';
@@ -171,12 +171,12 @@ class PublishSubscribe implements PublishSubscribeInterface
     const OTAG_SEP = '#';
     const ONS_SEP = '@';
     
-    private static function get_pubsub( ) 
+    protected static function get_pubsub( ) 
     { 
         return array( 'notopics'=> array( 'notags'=> array('namespaces'=> array(), 'list'=> array(), 'oneOffs'=> 0), 'tags'=> array() ), 'topics'=> array() );
     }
     
-    private static function parse_topic( $seps, $topic )
+    protected static function parse_topic( $seps, $topic )
     {
         $nspos = strpos( $topic, $seps[2] );
         $tagspos = strpos( $topic, $seps[1] );
@@ -204,7 +204,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         return array($topic, $tags, $namespaces);
     }
     
-    private static function get_all_topics( $seps, $topic ) 
+    protected static function get_all_topics( $seps, $topic ) 
     { 
         $topics = array();
         $tags = array(); 
@@ -267,7 +267,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         return array(count($topics) ? $topics[0] : '', $topics, $tags, $namespaces);
     }
     
-    private static function update_namespaces( &$pbns, &$namespaces, $nl=0 )
+    protected static function update_namespaces( &$pbns, &$namespaces, $nl=0 )
     {
         foreach ($namespaces as $ns)
         {
@@ -283,7 +283,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         }
     }
     
-    private static function remove_namespaces( &$pbns, &$namespaces, $nl=0 )
+    protected static function remove_namespaces( &$pbns, &$namespaces, $nl=0 )
     {
         foreach ($namespaces as $ns)
         {
@@ -297,7 +297,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         }
     }
     
-    private static function match_namespace( &$pbns, &$namespaces, $nl=0 )
+    protected static function match_namespace( &$pbns, &$namespaces, $nl=0 )
     {
         foreach ($namespaces as $ns)
         {
@@ -307,7 +307,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         return true;
     }
     
-    private static function check_is_subscribed( &$pubsub, &$subscribedTopics, $topic, $tag, &$namespaces, $nl )
+    protected static function check_is_subscribed( &$pubsub, &$subscribedTopics, $topic, $tag, &$namespaces, $nl )
     {
         $_topic = $topic ? ('tp_'.$topic) : false;
         $_tag = $tag ? ('tg_'.$tag) : false;
@@ -358,7 +358,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         return false;
     }
     
-    private static function get_subscribed_topics( $seps, &$pubsub, $atopic )
+    protected static function get_subscribed_topics( $seps, &$pubsub, $atopic )
     {
         $all = self::get_all_topics( $seps, $atopic );
         $topics = $all[ 1 ];
@@ -405,7 +405,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         return array($topTopic, $subscribedTopics, $namespaces);
     }
     
-    private static function &unsubscribe_oneoffs( &$subscribers )
+    protected static function &unsubscribe_oneoffs( &$subscribers )
     {
         // unsubscribeOneOffs
         if ( $subscribers && isset($subscribers['list']) && count($subscribers['list']) > 0 )
@@ -432,7 +432,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         return $subscribers;
     }
     
-    private static function publish( &$target, $seps, &$pubsub, $topic, &$data )
+    protected static function publish( &$target, $seps, &$pubsub, $topic, &$data )
     {
         if ( !empty($pubsub) )
         {
@@ -446,7 +446,7 @@ class PublishSubscribe implements PublishSubscribeInterface
             if ( !empty($topics) )
             {
                 $evt = new PublishSubscribeEvent( $target );
-                $evt->data->data =& $data;
+                $evt->data =& $data;
                 if ( $topTopic ) $evt->originalTopic = explode( self::OTOPIC_SEP, $topTopic );
                 else $evt->originalTopic = array( );
             }
@@ -506,7 +506,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         }
     }
     
-    private static function create_pipeline_loop( &$evt, &$topics, $abort=null )
+    protected static function create_pipeline_loop( &$evt, &$topics, $abort=null, $finish=null )
     {
         $topTopic = $topics[ 0 ];
         $namespaces = $topics[ 2 ];
@@ -519,7 +519,8 @@ class PublishSubscribe implements PublishSubscribeInterface
         'topics' =>& $topics,
         'namespaces' =>& $namespaces,
         'hasNamespace' => false,
-        'abort'=> $abort
+        'abort'=> $abort,
+        'finish'=> $finish
         ));
         
         if ( $topTopic ) $evt->originalTopic = explode( self::OTOPIC_SEP, $topTopic );
@@ -530,6 +531,8 @@ class PublishSubscribe implements PublishSubscribeInterface
     
     public static function pipeline_loop( $evt )
     {
+        if ( !$evt->non_local ) return;
+        
         $non_local =& $evt->non_local;
         
         if ($non_local->t < count($non_local->topics))
@@ -542,8 +545,18 @@ class PublishSubscribe implements PublishSubscribeInterface
                 // stop event bubble propagation
                 if ( $evt->aborted() || !$evt->propagates() )
                 {
-                    if ( $evt->aborted() && is_callable($non_local->abort) ) 
-                        call_user_func( $non_local->abort, $evt );
+                    if ( $evt->aborted() && is_callable($non_local->abort) )
+                    {
+                        $abort = $non_local->abort;
+                        $non_local->abort = null;
+                        call_user_func( $abort, $evt );
+                        if ( is_callable($non_local->finish) )
+                        {
+                            $finish = $non_local->finish;
+                            $non_local->finish = null;
+                            call_user_func( $finish, $evt );
+                        }
+                    }
                     return false;
                 }
                 
@@ -568,8 +581,18 @@ class PublishSubscribe implements PublishSubscribeInterface
                     // unsubscribeOneOffs
                     self::unsubscribe_oneoffs( $non_local->subscribers );
                     
-                    if ( $evt->aborted() && is_callable($non_local->abort) ) 
-                        call_user_func( $non_local->abort, $evt );
+                    if ( $evt->aborted() && is_callable($non_local->abort) )
+                    {
+                        $abort = $non_local->abort;
+                        $non_local->abort = null;
+                        call_user_func( $abort, $evt );
+                        if ( is_callable($non_local->finish) )
+                        {
+                            $finish = $non_local->finish;
+                            $non_local->finish = null;
+                            call_user_func( $finish, $evt );
+                        }
+                    }
                     return false;
                 }
                 
@@ -587,6 +610,13 @@ class PublishSubscribe implements PublishSubscribeInterface
                     }
                     $non_local->s += 1;
                 }
+                
+                if ($non_local->s>=count($non_local->subscribers['list']))
+                {
+                    $non_local->t += 1;
+                    $non_local->start_topic = true;
+                }
+                
                 if ( $done )
                 {
                     if ( $non_local->hasNamespace ) $evt->namespaces = array_merge(array(), $subscriber[ 3 ]);
@@ -595,22 +625,41 @@ class PublishSubscribe implements PublishSubscribeInterface
                     $subscriber[ 4 ] = 1; // subscriber called
                     $res = call_user_func( $subscriber[ 0 ], $evt );
                 }
-            }        
-            
-            if ($non_local->s>=count($non_local->subscribers['list']))
+            }
+            else
             {
                 $non_local->t += 1;
                 $non_local->start_topic = true;
             }
         }
-        else
+        
+        if ( !$evt->non_local ) return;
+        
+        if ($non_local->t >= count($non_local->topics))
         {
             // unsubscribeOneOffs
             self::unsubscribe_oneoffs( $non_local->subscribers );
             
+            if ( is_callable($non_local->finish) )
+            {
+                $finish = $non_local->finish;
+                $non_local->finish = null;
+                call_user_func( $finish, $evt );
+            }
+            
             if ( $evt )
             {
-                $evt->non_local->dispose();
+                $evt->non_local->dispose(array(
+                    't',
+                    's',
+                    'start_topic',
+                    'subscribers',
+                    'topics',
+                    'namespaces',
+                    'hasNamespace',
+                    'abort',
+                    'finish'
+                ));
                 $evt->non_local = null;
                 $evt->dispose();
                 $evt = null;
@@ -618,7 +667,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         }
     }
     
-    private static function static_pipeline( &$target, $seps, &$pubsub, $topic, &$data, $abort=null )
+    protected static function static_pipeline( &$target, $seps, &$pubsub, $topic, &$data, $abort=null, $finish=null )
     {
         if ( !empty($pubsub) )
         {
@@ -628,14 +677,14 @@ class PublishSubscribe implements PublishSubscribeInterface
             if ( !empty($topics[ 1 ]) )
             {
                 $evt = new PublishSubscribeEvent( $target );
-                $evt->data->data =& $data;
-                $evt->pipeline( self::create_pipeline_loop($evt, $topics, $abort) );
+                $evt->data =& $data;
+                $evt->pipeline( self::create_pipeline_loop($evt, $topics, $abort, $finish) );
                 self::pipeline_loop( $evt );
             }
         }
     }
     
-    private static function subscribe( $seps, &$pubsub, $topic, $subscriber, $oneOff=false, $on1=false )
+    protected static function subscribe( $seps, &$pubsub, $topic, $subscriber, $oneOff=false, $on1=false )
     {
         if ( !empty($pubsub) && is_callable($subscriber) )
         {
@@ -705,7 +754,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         }
     }
     
-    private static function remove_subscriber( &$pb, $hasSubscriber, $subscriber, &$namespaces, $nslen )
+    protected static function remove_subscriber( &$pb, $hasSubscriber, $subscriber, &$namespaces, $nslen )
     {
         $pos = count($pb['list']);
         
@@ -759,7 +808,7 @@ class PublishSubscribe implements PublishSubscribeInterface
         }
     }
     
-    private static function unsubscribe( $seps, &$pubsub, $topic, $subscriber=null )
+    protected static function unsubscribe( $seps, &$pubsub, $topic, $subscriber=null )
     {
         if ( !empty($pubsub) )
         {
@@ -846,8 +895,8 @@ class PublishSubscribe implements PublishSubscribeInterface
         return new PublishSubscribeData($props);
     }
     
-    private $_seps = null;
-    private $_pubsub = null;
+    protected $_seps = null;
+    protected $_pubsub = null;
         
     //
     // PublishSubscribe (Interface)
@@ -897,12 +946,12 @@ class PublishSubscribe implements PublishSubscribeInterface
         return $this;
     }
     
-    public function pipeline( $message, $data=array(), $abort=null/*, $delay=0*/ ) 
+    public function pipeline( $message, $data=array(), $abort=null, $finish=null/*, $delay=0*/ ) 
     {
         //$delay = intval($delay);
         //if ( !$data ) $data = array();
         //print_r($this->_pubsub);
-        self::static_pipeline( $this, $this->_seps, $this->_pubsub, $message, $data, $abort );
+        self::static_pipeline( $this, $this->_seps, $this->_pubsub, $message, $data, $abort, $finish );
         //print_r($this->_pubsub);
         return $this;
     }

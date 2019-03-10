@@ -7,7 +7,7 @@ rem #   https://github.com/foo123/Beeld
 rem #
 rem ###################################################
 
-rem ugliifyjs is default compiler if no compiler specified and minify directive is ON
+rem uglifyjs is default compiler if no compiler specified and minify directive is ON
 
 rem to use the python build tool do:
 rem python Beeld.py --config "beeld-sample.json" --compiler yui

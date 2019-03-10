@@ -12,7 +12,7 @@ module.exports = {
             evaluate = Beeld.Utils.evaluate
         ;
         var action_doc = function action_doc( evt ){
-            var params = evt.data.data, 
+            var params = evt.data, 
                 options = params.options, 
                 data = params.data, 
                 current = params.current,

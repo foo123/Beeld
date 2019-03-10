@@ -6,7 +6,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.8.1
+*   @version: 0.9.0
 *
 **/
 if (!class_exists('Beeld'))
@@ -173,7 +173,7 @@ final class BeeldUtils
     // http://stackoverflow.com/questions/10778318/test-if-a-string-is-regex
     public static function regex($rex, $evt) 
     {
-        $settings = $evt->data->data->config['settings'];
+        $settings = $evt->data->config['settings'];
         if ( $settings['RegExp'] && is_string($rex) && self::startsWith($rex, $settings['RegExp']) ) 
             return '/' . str_replace('/', '\\/', substr($rex, strlen($settings['RegExp']))) . '/';
         return false;
@@ -181,7 +181,7 @@ final class BeeldUtils
     
     public static function xpresion($xpr, $evt) 
     {
-        $settings = $evt->data->data->config['settings'];
+        $settings = $evt->data->config['settings'];
         if ( $settings['Xpresion'] )
         {
             if ( $xpr instanceof Xpresion ) 
@@ -467,7 +467,7 @@ final class BeeldActions
 {
     public static function abort($evt, $params=null)
     {
-        if ( $evt && null === $params ) $params =& $evt->data->data;
+        if ( $evt && null === $params ) $params =& $evt->data;
         //$config =& $params->config;
         $options =& $params->options;
         $data =& $params->data;
@@ -487,7 +487,7 @@ final class BeeldActions
     
     public static function process_loop($evt)
     {
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
@@ -527,7 +527,7 @@ final class BeeldActions
     
     public static function log($evt)
     {
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
@@ -550,7 +550,7 @@ final class BeeldActions
     
     public static function finish($evt)
     { 
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
@@ -567,7 +567,7 @@ final class BeeldActions
     
     public static function next_action($evt) 
     {
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $current =& $params->current;
         $task_actions = $current->task_actions;
         if ( $task_actions && $task_actions->hasNext() )
@@ -593,7 +593,7 @@ final class BeeldActions
     
     public static function next_task($evt) 
     {
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
@@ -667,7 +667,7 @@ final class BeeldActions
     
     public static function action_src($evt)
     {
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
@@ -711,7 +711,7 @@ final class BeeldActions
     
     public static function action_header($evt)
     {
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
@@ -742,7 +742,7 @@ final class BeeldActions
     
     public static function action_replace($evt)
     {
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
@@ -768,7 +768,7 @@ final class BeeldActions
     
     public static function action_shellprocess($evt)
     { 
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $current =& $params->current;
         if ( $current->action_cfg )
         {
@@ -787,7 +787,7 @@ final class BeeldActions
     
     public static function action_bundle($evt)
     {
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
@@ -822,7 +822,7 @@ final class BeeldActions
     
     public static function action_out($evt)
     { 
-        $params =& $evt->data->data;
+        $params =& $evt->data;
         $options =& $params->options;
         $data =& $params->data;
         //$current =& $params->current;
@@ -843,7 +843,7 @@ final class BeeldActions
 // extends/implements PublishSubscribe
 class Beeld extends PublishSubscribe
 {
-    const VERSION = "0.8.1";
+    const VERSION = "0.9.0";
     public static $Parsers = null;
     
     public $actions = null;

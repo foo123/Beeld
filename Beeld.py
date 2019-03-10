@@ -5,7 +5,7 @@
 #   https://github.com/foo123/Beeld
 #
 #   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-#   @version: 0.8.1
+#   @version: 0.9.0
 #
 ##
 
@@ -150,13 +150,13 @@ def multi_replace(tpl, reps):
 REGEXP = type(re.compile('regex'))
 def regex(rex, evt):
     global REGEXP
-    settings = evt.data.data.config['settings']
+    settings = evt.data.config['settings']
     if isinstance(rex, REGEXP): return rex
     elif settings['RegExp'] and rex.startswith(settings['RegExp']): return re.compile(rex[len(settings['RegExp']):])
     return False
     
 def xpresion(xpr, evt):
-    settings = evt.data.data.config['settings']
+    settings = evt.data.config['settings']
     if settings['Xpresion']:
         if isinstance(xpr,Xpresion):
             return xpr
@@ -342,7 +342,7 @@ class BeeldCompiler:
 class BeeldActions:
     
     def abort(evt, params=None):
-        if evt and None==params: params = evt.data.data
+        if evt and None==params: params = evt.data
         config = params.config
         options = params.options
         data = params.data
@@ -360,7 +360,7 @@ class BeeldActions:
         sys.exit(1)
         
     def log(evt):
-        params = evt.data.data
+        params = evt.data
         options = params.options
         data = params.data
         current = params.current
@@ -379,7 +379,7 @@ class BeeldActions:
         evt.next( )
 
     def finish(evt):
-        params = evt.data.data
+        params = evt.data
         #config = params.config
         options = params.options
         data = params.data
@@ -395,7 +395,7 @@ class BeeldActions:
         evt.dispose()
 
     def next_action(evt):
-        params = evt.data.data
+        params = evt.data
         current = params.current
         task_actions = current.task_actions
         if task_actions and task_actions.hasNext():
@@ -414,7 +414,7 @@ class BeeldActions:
         
             
     def next_task(evt):
-        params = evt.data.data
+        params = evt.data
         options = params.options
         data = params.data
         current = params.current
@@ -472,7 +472,7 @@ class BeeldActions:
     #    evt.next()
 
     def action_src(evt):
-        params = evt.data.data
+        params = evt.data
         options = params.options
         data = params.data
         current = params.current
@@ -505,7 +505,7 @@ class BeeldActions:
         evt.next()
 
     def action_header(evt):
-        params = evt.data.data
+        params = evt.data
         options = params.options
         data = params.data
         current = params.current
@@ -528,7 +528,7 @@ class BeeldActions:
         evt.next()
 
     def action_replace(evt):
-        params = evt.data.data
+        params = evt.data
         options = params.options
         data = params.data
         current = params.current
@@ -552,7 +552,7 @@ class BeeldActions:
         evt.next()
         
     def action_shellprocess(evt):
-        params = evt.data.data
+        params = evt.data
         options = params.options
         data = params.data
         current = params.current
@@ -605,7 +605,7 @@ class BeeldActions:
             evt.next( )
         
     def action_bundle(evt):
-        params = evt.data.data
+        params = evt.data
         options = params.options
         data = params.data
         current = params.current
@@ -631,7 +631,7 @@ class BeeldActions:
         evt.next()
 
     def action_out(evt):
-        params = evt.data.data
+        params = evt.data
         options = params.options
         data = params.data
         #current = params.current
@@ -694,7 +694,7 @@ Xpresion.defRuntimeFunc({
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
     
-    VERSION = "0.8.1"
+    VERSION = "0.9.0"
     
     ROOT      = BEELD_ROOT
     INCLUDES  = BEELD_INCLUDES

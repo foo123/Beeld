@@ -26,7 +26,7 @@ function beeld_plugin_action_minify( $evt )
         'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}'
     )
     );
-    $params =& $evt->data->data;
+    $params =& $evt->data;
     $options =& $params->options;
     $data =& $params->data;
     $current =& $params->current;

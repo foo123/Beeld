@@ -1,29 +1,30 @@
 /**
 *  PublishSubscribe
-*  A simple publish-subscribe implementation for PHP, Python, Node/JS
+*  A simple publish-subscribe implementation for PHP, Python, Node/XPCOM/JS
 *
-*  @version: 0.4.1
+*  @version: 1.1.0
 *  https://github.com/foo123/PublishSubscribe
 *
 **/
-!function( root, name, factory ) {
+!function( root, name, factory ){
 "use strict";
-var m;
 if ( ('undefined'!==typeof Components)&&('object'===typeof Components.classes)&&('object'===typeof Components.classesByID)&&Components.utils&&('function'===typeof Components.utils['import']) ) /* XPCOM */
-    (root.EXPORTED_SYMBOLS = [ name ]) && (root[ name ] = factory.call( root ));
+    (root.$deps = root.$deps||{}) && (root.EXPORTED_SYMBOLS = [name]) && (root[name] = root.$deps[name] = factory.call(root));
 else if ( ('object'===typeof module)&&module.exports ) /* CommonJS */
-    module.exports = factory.call( root );
-else if ( ('function'===typeof(define))&&define.amd&&('function'===typeof(require))&&('function'===typeof(require.specified))&&require.specified(name) ) /* AMD */
-    define(name,['require','exports','module'],function( ){return factory.call( root );});
+    (module.$deps = module.$deps||{}) && (module.exports = module.$deps[name] = factory.call(root));
+else if ( ('undefined'!==typeof System)&&('function'===typeof System.register)&&('function'===typeof System['import']) ) /* ES6 module */
+    System.register(name,[],function($__export){$__export(name, factory.call(root));});
+else if ( ('function'===typeof define)&&define.amd&&('function'===typeof require)&&('function'===typeof require.specified)&&require.specified(name) /*&& !require.defined(name)*/ ) /* AMD */
+    define(name,['module'],function(module){factory.moduleUri = module.uri; return factory.call(root);});
 else if ( !(name in root) ) /* Browser/WebWorker/.. */
-    (root[ name ] = (m=factory.call( root )))&&('function'===typeof(define))&&define.amd&&define(function( ){return m;} );
-}(  /* current root */          this, 
+    (root[name] = factory.call(root)||1)&&('function'===typeof(define))&&define.amd&&define(function(){return root[name];} );
+}(  /* current root */          'undefined' !== typeof self ? self : this, 
     /* module name */           "PublishSubscribe",
-    /* module factory */        function( undef ) {
+    /* module factory */        function ModuleFactory__PublishSubscribe( undef ){
 "use strict";
 
-var __version__ = "0.4.1", 
-    PROTO = 'prototype', HAS = 'hasOwnProperty',
+var __version__ = "1.1.0", 
+    PROTO = 'prototype', HAS = Object[PROTO].hasOwnProperty,
     TOPIC_SEP = '/', TAG_SEP = '#', NS_SEP = '@',
     OTOPIC_SEP = '/', OTAG_SEP = '#', ONS_SEP = '@',
     KEYS = Object.keys,
@@ -36,7 +37,7 @@ function PublishSubscribeData( props )
     {
         for (var k in props)
         {
-            if ( props[HAS](k) )
+            if ( HAS.call(props,k) )
                 this[ k ] = props[ k ];
         }
     }
@@ -66,7 +67,7 @@ function PublishSubscribeEvent(target, topic, original, tags, namespaces)
     else self.tags = [ ];
     if ( namespaces )  self.namespaces = [].concat( namespaces );
     else self.namespaces = [ ];
-    self.data = new PublishSubscribeData();
+    self.data = null;//new PublishSubscribeData();
     self.timestamp = NOW( );
     self._propagates = true;
     self._stopped = false;
@@ -265,7 +266,7 @@ function update_namespaces( pbns, namespaces, nl )
     for (n=0; n<nl; n++)
     {
         ns = 'ns_' + namespaces[n];
-        if ( !pbns[HAS](ns) )
+        if ( !HAS.call(pbns,ns) )
         {
             pbns[ ns ] = 1;
         }
@@ -282,7 +283,7 @@ function remove_namespaces( pbns, namespaces, nl )
     for (n=0; n<nl; n++)
     {
         ns = 'ns_' + namespaces[n];
-        if ( pbns[HAS](ns) )
+        if ( HAS.call(pbns,ns) )
         {
             pbns[ ns ]--;
             if ( pbns[ ns ] <=0 ) delete pbns[ ns ];
@@ -296,7 +297,7 @@ function match_namespace( pbns, namespaces, nl )
     for (n=0; n<nl; n++)
     {
         ns = 'ns_' + namespaces[n];
-        if ( !pbns[HAS](ns) || (0 >= pbns[ ns ]) ) return false;
+        if ( !HAS.call(pbns,ns) || (0 >= pbns[ ns ]) ) return false;
     }
     return true;
 }
@@ -306,9 +307,9 @@ function check_is_subscribed( pubsub, subscribedTopics, topic, tag, namespaces, 
     var _topic = !!topic ? 'tp_' + topic : false, 
         _tag = !!tag ? 'tg_' + tag : false;
         
-    if ( _topic && pubsub.topics[HAS](_topic) )
+    if ( _topic && HAS.call(pubsub.topics,_topic) )
     {
-        if ( _tag && pubsub.topics[ _topic ].tags[HAS](_tag) )
+        if ( _tag && HAS.call(pubsub.topics[ _topic ].tags,_tag) )
         {
             if ( pubsub.topics[ _topic ].tags[ _tag ].list.length &&
                 (nl <= 0 || match_namespace( pubsub.topics[ _topic ].tags[ _tag ].namespaces, namespaces, nl )) )
@@ -329,7 +330,7 @@ function check_is_subscribed( pubsub, subscribedTopics, topic, tag, namespaces, 
     }
     else
     {
-        if ( _tag && pubsub.notopics.tags[HAS](_tag) )
+        if ( _tag && HAS.call(pubsub.notopics.tags,_tag) )
         {
             if ( pubsub.notopics.tags[ _tag ].list.length &&
                 (nl <= 0 || match_namespace( pubsub.notopics.tags[ _tag ].namespaces, namespaces, nl )) )
@@ -369,7 +370,7 @@ function get_subscribed_topics( seps, pubsub, atopic )
         while ( l )
         {
             topic = topics[ 0 ]; //_topic = 'tp_' + topic;
-            if ( pubsub.topics[HAS]( 'tp_' + topic ) ) 
+            if ( HAS.call(pubsub.topics, 'tp_' + topic) ) 
             {
                 if ( tl > 0 )
                 {
@@ -411,7 +412,7 @@ function get_subscribed_topics( seps, pubsub, atopic )
 
 function unsubscribe_oneoffs( subscribers )
 {
-    if ( subscribers && subscribers[HAS]("list") )
+    if ( subscribers && HAS.call(subscribers,"list") )
     {
         // unsubscribeOneOffs
         var s, sl, subs, subscriber;
@@ -456,7 +457,7 @@ function publish( target, seps, pubsub, topic, data )
         if ( tl > 0 ) 
         {
             evt = new PublishSubscribeEvent( target );
-            evt.data.data = data;
+            evt.data = data;
             evt.originalTopic = topTopic ? topTopic.split( OTOPIC_SEP ) : [ ];
         }
         
@@ -515,7 +516,7 @@ function publish( target, seps, pubsub, topic, data )
     }
 }
 
-function create_pipeline_loop( evt, topics, abort )
+function create_pipeline_loop( evt, topics, abort, finish )
 {
     var topTopic = topics[ 0 ],
         namespaces = topics[ 2 ],
@@ -528,11 +529,14 @@ function create_pipeline_loop( evt, topics, abort )
         'topics': topics,
         'namespaces': namespaces,
         'hasNamespace': false,
-        'abort': abort
+        'abort': abort,
+        'finish': finish
     });
     evt.originalTopic = topTopic ? topTopic.split( OTOPIC_SEP ) : [ ];
     var pipeline_loop = function pipeline_loop( evt ) {
-        var res, non_local = evt.non_local, subTopic, tags, subscriber, done;
+        if ( !evt.non_local ) return;
+        
+        var res, non_local = evt.non_local, subTopic, tags, subscriber, done, abort, finish;
         
         if (non_local.t < non_local.topics.length)
         {
@@ -544,7 +548,18 @@ function create_pipeline_loop( evt, topics, abort )
                 // stop event propagation
                 if ( evt.aborted() || !evt.propagates() ) 
                 {
-                    if ( evt.aborted() && 'function' === typeof non_local.abort ) non_local.abort( evt );
+                    if ( evt.aborted() && 'function' === typeof non_local.abort )
+                    {
+                        abort = non_local.abort;
+                        non_local.abort = null;
+                        abort( evt );
+                        if ( 'function' === typeof non_local.finish )
+                        {
+                            finish = non_local.finish;
+                            non_local.finish = null;
+                            finish( evt );
+                        }
+                    }
                     return false;
                 }
                 
@@ -567,7 +582,18 @@ function create_pipeline_loop( evt, topics, abort )
                     // unsubscribeOneOffs
                     unsubscribe_oneoffs( non_local.subscribers );
                     
-                    if ( evt.aborted() && 'function' === typeof non_local.abort ) non_local.abort( evt );
+                    if ( evt.aborted() && 'function' === typeof non_local.abort )
+                    {
+                        abort = non_local.abort;
+                        non_local.abort = null;
+                        abort( evt );
+                        if ( 'function' === typeof non_local.finish )
+                        {
+                            finish = non_local.finish;
+                            non_local.finish = null;
+                            finish( evt );
+                        }
+                    }
                     return false;
                 }
                 
@@ -584,6 +610,13 @@ function create_pipeline_loop( evt, topics, abort )
                     }
                     non_local.s += 1;
                 }
+                
+                if (non_local.s >= non_local.subscribers.list.length)
+                {
+                    non_local.t += 1;
+                    non_local.start_topic = true;
+                }
+                
                 if ( done )
                 {
                     if ( non_local.hasNamespace ) evt.namespaces = subscriber[ 3 ].slice( 0 );
@@ -593,21 +626,40 @@ function create_pipeline_loop( evt, topics, abort )
                     res = subscriber[ 0 ]( evt );
                 }
             }
-            
-            if (non_local.s >= non_local.subscribers.list.length)
+            else
             {
                 non_local.t += 1;
                 non_local.start_topic = true;
             }
         }
-        else 
+        
+        if ( !evt.non_local ) return;
+        
+        if (non_local.t >= non_local.topics.length)
         {
             // unsubscribeOneOffs
             unsubscribe_oneoffs( non_local.subscribers );
             
+            if ( 'function' === typeof non_local.finish )
+            {
+                finish = non_local.finish;
+                non_local.finish = null;
+                finish( evt );
+            }
+            
             if ( evt )
             {
-                evt.non_local.dispose();
+                evt.non_local.dispose([
+                    't',
+                    's',
+                    'start_topic',
+                    'subscribers',
+                    'topics',
+                    'namespaces',
+                    'hasNamespace',
+                    'abort',
+                    'finish'
+                ]);
                 evt.non_local = null;
                 evt.dispose();
                 evt = null;
@@ -617,7 +669,7 @@ function create_pipeline_loop( evt, topics, abort )
     return pipeline_loop;
 }
 
-function pipeline( target, seps, pubsub, topic, data, abort )
+function pipeline( target, seps, pubsub, topic, data, abort, finish )
 {
     if ( pubsub )
     {
@@ -625,8 +677,8 @@ function pipeline( target, seps, pubsub, topic, data, abort )
         if ( topics[ 1 ].length > 0 ) 
         {
             evt = new PublishSubscribeEvent( target );
-            evt.data.data = data;
-            evt.pipeline( pipeline_loop = create_pipeline_loop( evt, topics, abort ) );
+            evt.data = data;
+            evt.pipeline( pipeline_loop = create_pipeline_loop( evt, topics, abort, finish ) );
             pipeline_loop( evt );
         }
     }
@@ -658,13 +710,13 @@ function subscribe( seps, pubsub, topic, subscriber, oneOff, on1 )
         if ( topic.length )
         {
             _topic = 'tp_' + topic;
-            if ( !pubsub.topics[HAS](_topic) ) 
+            if ( !HAS.call(pubsub.topics,_topic) ) 
                 pubsub.topics[ _topic ] = { notags: {namespaces: {}, list: [], oneOffs: 0}, tags: {} };
             
             if ( tagslen )
             {
                 _tag = 'tg_' + tags;
-                if ( !pubsub.topics[ _topic ].tags[HAS](_tag) ) 
+                if ( !HAS.call(pubsub.topics[ _topic ].tags,_tag) ) 
                     pubsub.topics[ _topic ].tags[ _tag ] = {namespaces: {}, list: [], oneOffs: 0};
                 
                 queue = pubsub.topics[ _topic ].tags[ _tag ];
@@ -679,7 +731,7 @@ function subscribe( seps, pubsub, topic, subscriber, oneOff, on1 )
             if ( tagslen )
             {
                 _tag = 'tg_' + tags;
-                if ( !pubsub.notopics.tags[HAS](_tag) ) 
+                if ( !HAS.call(pubsub.notopics.tags,_tag) ) 
                     pubsub.notopics.tags[ _tag ] = {namespaces: {}, list: [], oneOffs: 0};
                 
                 queue = pubsub.notopics.tags[ _tag ];
@@ -772,9 +824,9 @@ function unsubscribe( seps, pubsub, topic, subscriber )
         hasSubscriber = !!(subscriber && ("function" === typeof( subscriber )));
         if ( !hasSubscriber ) subscriber = null;
         
-        if ( topiclen && pubsub.topics[HAS](_topic) )
+        if ( topiclen && HAS.call(pubsub.topics,_topic) )
         {
-            if ( tagslen && pubsub.topics[ _topic ].tags[HAS](_tag) ) 
+            if ( tagslen && HAS.call(pubsub.topics[ _topic ].tags,_tag) ) 
             {
                 remove_subscriber( pubsub.topics[ _topic ].tags[ _tag ], hasSubscriber, subscriber, namespaces, nslen );
                 if ( !pubsub.topics[ _topic ].tags[ _tag ].list.length )
@@ -791,7 +843,7 @@ function unsubscribe( seps, pubsub, topic, subscriber )
         {
             if ( tagslen )
             {
-                if ( pubsub.notopics.tags[HAS](_tag) )
+                if ( HAS.call(pubsub.notopics.tags,_tag) )
                 {
                     remove_subscriber( pubsub.notopics.tags[ _tag ], hasSubscriber, subscriber, namespaces, nslen );
                     if ( !pubsub.notopics.tags[ _tag ].list.length )
@@ -801,7 +853,7 @@ function unsubscribe( seps, pubsub, topic, subscriber )
                 // remove from any topics as well
                 for ( t in pubsub.topics )
                 {
-                    if ( pubsub.topics[HAS](t) && pubsub.topics[ t ].tags[HAS](_tag) )
+                    if ( HAS.call(pubsub.topics,t) && HAS.call(pubsub.topics[ t ].tags,_tag) )
                     {
                         remove_subscriber( pubsub.topics[ t ].tags[ _tag ], hasSubscriber, subscriber, namespaces, nslen );
                         if ( !pubsub.topics[ t ].tags[ _tag ].list.length )
@@ -816,7 +868,7 @@ function unsubscribe( seps, pubsub, topic, subscriber )
                 // remove from any tags as well
                 for ( t2 in pubsub.notopics.tags )
                 {
-                    if ( pubsub.notopics.tags[HAS](t2) )
+                    if ( HAS.call(pubsub.notopics.tags,t2) )
                     {
                         remove_subscriber( pubsub.notopics.tags[ t2 ], hasSubscriber, subscriber, namespaces, nslen );
                         if ( !pubsub.notopics.tags[ t2 ].list.length )
@@ -827,13 +879,13 @@ function unsubscribe( seps, pubsub, topic, subscriber )
                 // remove from any topics and tags as well
                 for ( t in pubsub.topics )
                 {
-                    if ( pubsub.topics[HAS](t) )
+                    if ( HAS.call(pubsub.topics,t) )
                     {
                         remove_subscriber( pubsub.topics[ t ].notags, hasSubscriber, subscriber, namespaces, nslen );
                         
                         for ( t2 in pubsub.topics[ t ].tags )
                         {
-                            if ( pubsub.topics[ t ].tags[HAS](t2) )
+                            if ( HAS.call(pubsub.topics[ t ].tags,t2) )
                             {
                                 remove_subscriber( pubsub.topics[ t ].tags[ t2 ], hasSubscriber, subscriber, namespaces, nslen );
                                 if ( !pubsub.topics[ t ].tags[ t2 ].list.length )
@@ -897,7 +949,7 @@ PublishSubscribe[PROTO] = {
         if ( 3 > arguments.length ) delay = 0;
         delay = +delay;
         
-        data = data || { };
+        if ( 2 > arguments.length ) data = { };
         if ( delay > 0 )
         {
             setTimeout(function( ) {
@@ -913,22 +965,22 @@ PublishSubscribe[PROTO] = {
         return self;
     }
     
-    ,pipeline: function( message, data, abort, delay ) {
+    ,pipeline: function( message, data, abort, finish, delay ) {
         var self = this;
-        if ( 4 > arguments.length ) delay = 0;
+        if ( 5 > arguments.length ) delay = 0;
         delay = +delay;
         
-        data = data || { };
+        if ( 2 > arguments.length ) data = { };
         if ( delay > 0 )
         {
             setTimeout(function( ) {
-                pipeline( self, self._seps, self._pubsub$, message, data, abort||null );
+                pipeline( self, self._seps, self._pubsub$, message, data, abort||null, finish||null );
             }, delay);
         }
         else
         {
             //console.log(JSON.stringify(self._pubsub$, null, 4));
-            pipeline( self, self._seps, self._pubsub$, message, data, abort||null );
+            pipeline( self, self._seps, self._pubsub$, message, data, abort||null, finish||null );
             //console.log(JSON.stringify(self._pubsub$, null, 4));
         }
         return self;

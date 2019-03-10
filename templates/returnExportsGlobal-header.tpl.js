@@ -30,7 +30,7 @@ if (typeof define === 'function' && define.amd) {
     // Browser globals
     root.returnExportsGlobal = factory(root.b);
 }
-}(this, function (b) {
+}('undefined' !== typeof self ? self : this, function (b) {
 //use b in some fashion.
 
 /* main code starts here */

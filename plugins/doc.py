@@ -8,7 +8,7 @@ def beeld_plugin_doc( beelder ):
     
 def beeld_plugin_action_doc( evt ):
     global Beeld
-    params = evt.data.data
+    params = evt.data
     options = params.options
     data = params.data
     current = params.current
