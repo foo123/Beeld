@@ -302,6 +302,8 @@ function show_help_msg( )
     echo ("                          DEFAULT: all tasks defined in config file");
     echo ("  --enc      ENCODING     set text encoding");
     echo ("                          DEFAULT: utf8");
+    echo ("  --compiler COMPILER     compiler to be used (if any)");
+    echo ("                          DEFAULT: uglifyjs");
     echo (" ");
 }
 
@@ -753,16 +755,16 @@ Beeld.Actions = {
                 if ( startsWith(filename, tplid) )
                 {
                     // template file
-                    get_tpl( filename.substr(tplidlen), options.encoding, function(err, data){
-                        if ( !err ) buffer.push(data);
+                    get_tpl( filename.substr(tplidlen), options.encoding, function(err, text){
+                        if ( !err ) buffer.push(text);
                         do_next();
                     } );
                 }
                 else
                 {
                     // src file
-                    read_async( get_real_path( filename, options.basePath ), options.encoding, function(err, data){
-                        if ( !err ) buffer.push(data);
+                    read_async( get_real_path( filename, options.basePath ), options.encoding, function(err, text){
+                        if ( !err ) buffer.push(text);
                         do_next();
                     } );
                 }
@@ -930,8 +932,8 @@ Beeld.Actions = {
             {
                 filename = bundleFiles[i++];
                 if (!filename.length) return do_next( );
-                read_async( get_real_path( filename, options.basePath ), options.encoding, function(err, data){
-                    if ( !err ) buffer.push(data);
+                read_async( get_real_path( filename, options.basePath ), options.encoding, function(err, text){
+                    if ( !err ) buffer.push(text);
                     do_next( );
                 } );
             }

@@ -176,7 +176,7 @@ def parse_options( defaults, required=None ):
         parser.add_argument('--config', help="configuration file (REQUIRED)", metavar="FILE")
         parser.add_argument('--tasks', help="specific tasks to run separated by commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
         parser.add_argument('--enc', help="set text encoding \nDEFAULT: utf-8", metavar="ENCODING", default=defaults['enc'])
-        parser.add_argument('--compiler', help="compiler used \nDEFAULT: uglifyjs", metavar="COMPILER", default=defaults['compiler'])
+        parser.add_argument('--compiler', help="compiler to be used (if any)\nDEFAULT: uglifyjs", metavar="COMPILER", default=defaults['compiler'])
         options, remainder = parser.parse_known_args()
 
     else:
@@ -184,7 +184,7 @@ def parse_options( defaults, required=None ):
         parser.add_option('--config', help="configuration file (REQUIRED)", metavar="FILE")
         parser.add_option('--tasks', dest='tasks', help="specific tasks to run separated by commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
         parser.add_option('--enc', dest='enc', help="set text encoding \nDEFAULT: utf-8", metavar="ENCODING", default=defaults['enc'])
-        parser.add_option('--compiler', dest='compiler', help="compiler used \nDEFAULT: uglifyjs", metavar="COMPILER", default=defaults['compiler'])
+        parser.add_option('--compiler', dest='compiler', help="compiler to be used (if any)\nDEFAULT: uglifyjs", metavar="COMPILER", default=defaults['compiler'])
         options, remainder = parser.parse_args()
 
     is_valid = True

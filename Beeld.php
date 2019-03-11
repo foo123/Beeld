@@ -249,6 +249,8 @@ final class BeeldUtils
         self::echo_("                          DEFAULT: all tasks defined in config file");
         self::echo_("  --enc      ENCODING     set text encoding");
         self::echo_("                          DEFAULT: utf8");
+        self::echo_("  --compiler COMPILER     compiler to be used (if any)");
+        self::echo_("                          DEFAULT: uglifyjs");
         self::echo_(" ");
     }
     
