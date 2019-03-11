@@ -62,7 +62,18 @@ class XpresionUtils
     
     public static function evaluator_factory( $evaluator_str, $Fn, $Cache )
     {
-        if ( version_compare(phpversion(), '5.3.0', '>=') )
+        if ( version_compare(phpversion(), '7.2.0', '>=') )
+        {
+            // create_function is deprecated
+            $evaluator_factory = eval('return function($Fn,$Cache){' . implode("\n", array(
+                '$evaluator = function($Var) use($Fn,$Cache) {',
+                '    return ' . $evaluator_str . ';',
+                '};',
+                'return $evaluator;'
+            )) . '};');
+            $evaluator = $evaluator_factory($Fn,$Cache);
+        }
+        elseif ( version_compare(phpversion(), '5.3.0', '>=') )
         {
             // use actual php anonynous function/closure
             $evaluator_factory = create_function('$Fn,$Cache', implode("\n", array(

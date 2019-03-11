@@ -40,7 +40,7 @@ def beeld_plugin_action_minify( evt ):
     if minify and '' != data.src:
         
         # fix compiler selection
-        selected = params.cmd_opts.compiler.lower() if hasattr(params.cmd_opts,'compiler') else None
+        selected = params.cmd_opts.compiler.lower() if hasattr(params.cmd_opts,'compiler') and isinstance(params.cmd_opts.compiler, str) else None
         if selected and (selected not in compilers): selected = 'uglifyjs'
         
         if 'uglifyjs' in minify:

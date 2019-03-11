@@ -1,7 +1,7 @@
 Beeld
 =====
 
-**A scriptable, extendable and configurable source code builder framework and tool in Node/Python/PHP**
+**A scriptable, extendable and configurable source code builder framework and tool in Node.js / Python / PHP**
 
 **version 0.9.0**
 
@@ -56,7 +56,6 @@ __For PHP__
 __For Node__
 * Node 0.8+
 * Modified standalone version of `yaml.js` (Symfony Yaml parser) by (c) Fabien Potencier, Jeremy Faivre (included)
-* `node-temp` package (global install preferrably)
 
 __Common Dependencies__
 * `UglifyJS2` package (global install)
@@ -72,5 +71,5 @@ __Common Dependencies__
 
 
 *URL* [Nikos Web Development](http://nikos-web-development.netai.net/ "Nikos Web Development")  
-*URL* [WorkingClassCode](http://workingclasscode.uphero.com/ "Working Class Code")  
+<!--*URL* [WorkingClassCode](http://workingclasscode.uphero.com/ "Working Class Code")-->
 

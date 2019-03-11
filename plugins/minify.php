@@ -41,22 +41,22 @@ function beeld_plugin_action_minify( $evt )
         
         if (isset($minify['uglifyjs']))
         {
-            $params->compilers['uglifyjs']->option(implode(" ", (array)$minify['uglifyjs']));
+            $compilers['uglifyjs']->option(implode(" ", (array)$minify['uglifyjs']));
             if ( !$selected ) $selected = 'uglifyjs';
         }
         if (isset($minify['closure']))
         {
-            $params->compilers['closure']->option(implode(" ", (array)$minify['closure']));
+            $compilers['closure']->option(implode(" ", (array)$minify['closure']));
             if ( !$selected ) $selected = 'closure';
         }
         if (isset($minify['yui']))
         {
-            $params->compilers['yui']->option(implode(" ", (array)$minify['yui']));
+            $compilers['yui']->option(implode(" ", (array)$minify['yui']));
             if ( !$selected ) $selected = 'yui';
         }
         if (isset($minify['cssmin']))
         {
-            $params->compilers['cssmin']->option(implode(" ", (array)$minify['cssmin']));
+            $compilers['cssmin']->option(implode(" ", (array)$minify['cssmin']));
             if ( !$selected ) $selected = 'cssmin';
         }
         
@@ -83,7 +83,8 @@ function beeld_plugin_action_minify( $evt )
         ));
         
         //$cmd = escapeshellcmd( $cmd );
-        exec($cmd . ' 2>&1', $out=array(), $err=0);
+        $out = array(); $err = 0;
+        exec($cmd . ' 2>&1', $out, $err);
         
         // some error occured
         if ( $err ) 

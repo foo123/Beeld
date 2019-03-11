@@ -4,7 +4,8 @@ module.exports = {
     
     beeld_plugin_minify: function( beelder ) {
         var Beeld = beelder.getClass(),
-            HAS = 'hasOwnProperty', exec_async = require('child_process').exec,
+            HAS = Object.prototype.hasOwnProperty,
+            exec_async = require('child_process').exec,
             write_async = Beeld.Utils.write_async,
             read_async = Beeld.Utils.read_async,
             echo_stderr = console.error,
@@ -40,28 +41,28 @@ module.exports = {
             if ( minify && !!data.src )
             {
                 // fix compiler selection
-                selected = params.cmd_opts[HAS]('compiler') ? params.cmd_opts.compiler.toLowerCase() : null;
-                if ( selected && !compilers[HAS](selected) ) selected = 'uglifyjs';
+                selected = HAS.call(params.cmd_opts,'compiler') && params.cmd_opts.compiler ? params.cmd_opts.compiler.toLowerCase() : null;
+                if ( selected && !HAS.call(compilers,selected) ) selected = 'uglifyjs';
                 
-                if ( minify[HAS]('uglifyjs') )
+                if ( HAS.call(minify,'uglifyjs') )
                 {
                     // make it array
                     compilers.uglifyjs.option([].concat( minify['uglifyjs'] ).join(" "));
                     if ( !selected ) selected = 'uglifyjs';
                 }
-                if ( minify[HAS]('closure') )
+                if ( HAS.call(minify,'closure') )
                 {
                     // make it array
                     compilers.closure.option([].concat( minify['closure'] ).join(" "));
                     if ( !selected ) selected = 'closure';
                 }
-                if ( minify[HAS]('yui') )
+                if ( HAS.call(minify,'yui') )
                 {
                     // make it array
                     compilers.yui.option([].concat( minify['yui'] ).join(" "));
                     if ( !selected ) selected = 'yui';
                 }
-                if ( minify[HAS]('cssmin') )
+                if ( HAS.call(minify,'cssmin') )
                 {
                     // make it array
                     compilers.cssmin.option([].concat( minify['cssmin'] ).join(" "));

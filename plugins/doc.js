@@ -4,7 +4,7 @@ module.exports = {
     
     beeld_plugin_doc: function( beelder ) {
         var Beeld = beelder.getClass(),
-            HAS = 'hasOwnProperty', 
+            HAS = Object.prototype.hasOwnProperty, 
             write_async = Beeld.Utils.write_async,
             get_real_path = Beeld.Utils.get_real_path,
             regex = Beeld.Utils.regex,
@@ -17,7 +17,7 @@ module.exports = {
                 data = params.data, 
                 current = params.current,
                 doc = current.action_cfg;
-            if ( doc && doc[HAS]('output') )
+            if ( doc && HAS.call(doc,'output') )
             {
                 doc['output'] = xpresion(doc['output'], evt); // parse xpresion if any
                 var docFile = get_real_path(evaluate(doc['output'], {}), options.basePath), 
@@ -26,9 +26,9 @@ module.exports = {
                     blocks, i, l, tmp, j, l2, sep
                 ;
                 
-                sep = doc[HAS]('separator') ? doc['separator'] : "\n\n";
+                sep = HAS.call(doc,'separator') ? doc['separator'] : "\n\n";
                 
-                if ( doc[HAS]('trim') )
+                if ( HAS.call(doc,'trim') )
                 {
                     _trim = regex(doc.trim, evt);
                     if ( false === _trim )

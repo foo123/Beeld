@@ -5,22 +5,21 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.9.0
+*   @version: 1.0.0
 *
 **/
 !function (root, name, factory) {
     // node, CommonJS, etc..
     if ( 'object' == typeof(module) && module.exports ) module.exports = factory();
+    else if ( !(name in root) ) root[name] = factory();
 }('undefined' !== typeof self ? self : this, 'Beeld', function( undef ) {
 "use strict";
-var PROTO = 'prototype', HAS = 'hasOwnProperty',
+var PROTO = 'prototype', HAS = Object.prototype.hasOwnProperty,
     // basic modules
-    fs = require('fs'), path = require('path'), 
+    fs = require('fs'), path = require('path'), os = require('os'),
     exec_async = require('child_process').exec,
-    realpath = fs.realpathSync, dirname = path.dirname, join_path = path.join,
+    realpath = fs.realpathSync, realpath_async = fs.realpath, dirname = path.dirname, join_path = path.join,
     exit = process.exit, echo = console.log, echo_stderr = console.error,
-    // extra modules needed, node-temp
-    temp = require('temp'),
     
     // auxilliary methods
     startsWith = String[PROTO].startsWith 
@@ -32,14 +31,29 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty',
         o1 = o1 || {}; 
         for (var p in o1)
         { 
-            if ( o2[HAS](p) && o1[HAS](p) && undef !== o2[p] ) 
+            if ( HAS.call(o2,p) && HAS.call(o1,p) && undef !== o2[p] ) 
                 o1[p] = o2[p]; 
         } 
         return o1; 
     },
     
+    FUUID = 0,
+    generateName = function(options) {
+      var now = new Date();
+      var name = [options.prefix||'',
+                  now.getFullYear(), now.getMonth(), now.getDate(),
+                  '-',
+                  process.pid,
+                  '-',
+                  (++FUUID).toString(16),
+                  '-',
+                  (Math.random() * 0x100000000 + 1).toString(36),
+                  options.suffix||''].join('');
+      return path.join(options.dir || path.resolve(os.tmpdir()), name);
+    },
+    
     tmpfile = function( ) {
-        return temp.path( {suffix: '.tmpnode'} );
+        return generateName( {suffix: '.tmpnode'} );
     },
     
     read = function( file, enc ) {
@@ -53,18 +67,18 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty',
     },
     
     read_async = function( file, enc, cb ) {
-        fs.exists(file, function(yes){
-            if ( yes )
-            {
+        /*fs.stat(file, function(err, stat){
+            if ( !err && stat )
+            {*/
                 fs.readFile(file, {encoding: enc||'utf8'}, function(err,data){
-                    if ( cb ) cb( err, data.toString() );
+                    if ( cb ) cb( err, err ? '' : data.toString() );
                 });
-            }
+            /*}
             else if ( cb )
             {
                 cb( '' );
             }
-        });
+        });*/
     },
     
     write = function( file, text, enc ) {
@@ -83,7 +97,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty',
     unlink_async = function( file ) {
         if ( file )
         {
-            fs.exists(file, function(yes){ if ( yes ) fs.unlink(file, function(err){ }); });
+            /*fs.exists(file, function(yes){ if ( yes )*/ fs.unlink(file/*, function(err){ }*/); /*});*/
         }
     },
     
@@ -101,7 +115,7 @@ var PROTO = 'prototype', HAS = 'hasOwnProperty',
 ; 
 
 BEELD_FILE = path.basename(__filename);
-BEELD_ROOT = realpath(__dirname);
+BEELD_ROOT = /*realpath(*/__dirname/*)*/;
 BEELD_INCLUDES = join_path(BEELD_ROOT, "includes") + '/';
 BEELD_PARSERS = join_path(BEELD_INCLUDES, "parsers") + '/';
 BEELD_TEMPLATES = join_path(BEELD_ROOT, "templates") + '/';
@@ -147,7 +161,7 @@ OrderedMap[PROTO] = {
         var om = this.om, i, l = om.length;
         for (i=0; i<l; i++)
         {
-            if (om[i] && om[i][HAS](key)) 
+            if (om[i] && HAS.call(om[i],key)) 
                 return i;
         }
         return -1;
@@ -164,7 +178,7 @@ OrderedMap[PROTO] = {
         var om = this.om, i, l = om.length;
         for (i=0; i<l; i++)
         {
-            if (om[i] && om[i][HAS](key)) 
+            if (om[i] && HAS.call(om[i],key)) 
                 return [key, om[i][key]];
         }
         return null;
@@ -302,8 +316,8 @@ function parse_options( defaults, required, on_error )
     {
         for (opt in defaults)
         {
-            if ( !defaults[HAS](opt) ) continue;
-            if ( !options[HAS](opt) ) options[opt] = defaults[opt];
+            if ( !HAS.call(defaults,opt) ) continue;
+            if ( !HAS.call(options,opt) ) options[opt] = defaults[opt];
         }
     }
     
@@ -319,7 +333,7 @@ function parse_options( defaults, required, on_error )
         for(i=0; i<required.length; i++)
         {
             opt = required[i];
-            if ( !options[HAS](opt) || !options[opt] || !options[opt].length )
+            if ( !HAS.call(options,opt) || !options[opt] || !options[opt].length )
             {
                 is_valid = false;
                 break;
@@ -336,13 +350,32 @@ function parse_options( defaults, required, on_error )
     return options;
 }
 
-function get_tpl( id, enc ) 
+function get_tpl( id, enc, cb ) 
 {
     var tpl, tpl_id = 'tpl_'+id;
-    if ( !TPLS[HAS](tpl_id) ) TPLS[tpl_id] = read( BEELD_TEMPLATES + id, enc );
-    tpl = TPLS[tpl_id];
-    return tpl.slice( );
+    if ( 'function' === typeof cb )
+    {
+        if ( !HAS.call(TPLS,tpl_id) )
+        {
+            read_async(BEELD_TEMPLATES + id, enc, function(err,data){
+                if ( !err ) TPLS[tpl_id] = ''+data;
+                cb(err, data);
+            });
+        }
+        else
+        {
+            cb(null, TPLS[tpl_id].slice());
+        }
+        return '';
+    }
+    else
+    {
+        if ( !HAS.call(TPLS,tpl_id) ) TPLS[tpl_id] = read( BEELD_TEMPLATES + id, enc );
+        tpl = TPLS[tpl_id];
+        return tpl.slice( );
+    }
 }
+
 
 function get_real_path( file, basePath ) 
 { 
@@ -450,7 +483,7 @@ Beeld = function Beeld( ) {
     ,'action_out': Beeld.Actions.action_out
     };
 };
-Beeld.VERSION = "0.9.0";
+Beeld.VERSION = "1.0.0";
 Beeld.FILE      = BEELD_FILE;
 Beeld.ROOT      = BEELD_ROOT;
 Beeld.INCLUDES  = BEELD_INCLUDES;
@@ -585,12 +618,14 @@ Beeld.Actions = {
     var params = evt.data,
         current = params.current,
         task_actions = current.task_actions;
+    //console.log('next_action');
     if ( task_actions && task_actions.hasNext() )
     {
         var a = task_actions.getNext(), 
             action = 'action_' + a[0];
-        if ( current.actions[HAS](action) )
+        if ( HAS.call(current.actions,action) )
         {
+            //console.log('next_action = '+a[0]);
             current.action = a[0];
             current.action_cfg = a[1];
             current.actions[ action ]( evt );
@@ -613,6 +648,7 @@ Beeld.Actions = {
         current_tasks = current.tasks,
         pipeline = params.pipeline
         ;
+    //console.log('next_task');
     if ( current_tasks && current_tasks.hasNext() )
     {
         var task = current_tasks.getNext();
@@ -621,6 +657,7 @@ Beeld.Actions = {
         current.task_actions = Beeld.OrderedMap(task[1]);
         current.action = '';
         current.action_cfg = null;
+        //console.log('next_task = '+task[0]);
         
         data.bundle = ''; 
         data.header = ''; 
@@ -638,16 +675,18 @@ Beeld.Actions = {
             options.out = null;
             options.outputToStdOut = true;
         }
+        
         // default header action
         // is first file of src if exists
         var src_action = current.task_actions.hasItemByKey('src');
         if ( !current.task_actions.getItemByKey('header') && (-1 < src_action) )
         {
             var src_cfg = current.task_actions.getItemByKey('src');
-            current.task_actions.om.splice(src_action, 0, {'header':src_cfg[1][0]});
+            current.task_actions.om.splice(src_action+1, 0, {'header':src_cfg[1][0]});
         }
         
-        pipeline.on('#actions', Beeld.Actions.log);
+        
+        /*pipeline.on('#actions', Beeld.Actions.log);
         
         while (current.task_actions.hasNext())
         {
@@ -663,13 +702,14 @@ Beeld.Actions = {
         else 
         {
             pipeline.on('#actions', Beeld.Actions.finish);
-        }
+        }*/
         
         evt.next( );
     }
     else
     {
-        Beeld.Actions.finish( evt );
+        //Beeld.Actions.finish( evt );
+        evt.next( );
     }
 }
 
@@ -702,21 +742,42 @@ Beeld.Actions = {
     if (srcFiles && count)
     {
         buffer = [];
-        for (i=0; i<count; i++)
-        {
-            filename = srcFiles[i];
-            if ( !filename.length ) continue;
-            
-            if ( startsWith(filename, tplid) )
-                // template file
-                buffer.push( get_tpl( filename.substr(tplidlen), options.encoding ) );
+        i = 0;
+        var do_next = function do_next(){
+            if ( i >= count )
+            {
+                data.src = buffer.join('');
+                evt.next( );
+            }
             else
-                // src file
-                buffer.push( read( get_real_path( filename, options.basePath ), options.encoding ) );
-        }
-        data.src = buffer.join('');
+            {
+                filename = srcFiles[i++];
+                if ( !filename.length ) return do_next( );
+                
+                if ( startsWith(filename, tplid) )
+                {
+                    // template file
+                    get_tpl( filename.substr(tplidlen), options.encoding, function(err, data){
+                        if ( !err ) buffer.push(data);
+                        do_next();
+                    } );
+                }
+                else
+                {
+                    // src file
+                    read_async( get_real_path( filename, options.basePath ), options.encoding, function(err, data){
+                        if ( !err ) buffer.push(data);
+                        do_next();
+                    } );
+                }
+            }
+        };
+        do_next( );
     }
-    evt.next( );
+    else
+    {
+        evt.next( );
+    }
 }
 ,action_header: function( evt ) {
     var params = evt.data, 
@@ -730,16 +791,27 @@ Beeld.Actions = {
     
     if ( headerFile && headerFile.length )
     {
-        headerText = read( get_real_path( headerFile, options.basePath ), options.encoding );
+        //console.log(headerFile);
+        read_async( get_real_path( headerFile, options.basePath ), options.encoding, function(err, data){
+            //console.log('header read');
+            if ( !err )
+            {
+                headerText = data;
+                if ( headerText && headerText.length )
+                {
+                    if ( startsWith(headerText, '/**') )
+                        data.header = headerText.substr(0, headerText.indexOf("**/")+3);
+                    else if ( startsWith(headerText, '/*!') )
+                        data.header = headerText.substr(0, headerText.indexOf("!*/")+3);
+                }
+            }
+            evt.next( );
+        } );
     }
-    if ( headerText && headerText.length )
+    else
     {
-        if ( startsWith(headerText, '/**') )
-            data.header = headerText.substr(0, headerText.indexOf("**/")+3);
-        else if ( startsWith(headerText, '/*!') )
-            data.header = headerText.substr(0, headerText.indexOf("!*/")+3);
+        evt.next( );
     }
-    evt.next( );
 }
 ,action_replace: function( evt ) {
     var params = evt.data, 
@@ -854,15 +926,28 @@ Beeld.Actions = {
     if (bundleFiles && count)
     {
         var buffer = [ ], i, filename;
-        for (i=0; i<count; i++)
-        {
-            filename = bundleFiles[i];
-            if (!filename.length) continue;
-            buffer.push( read( get_real_path( filename, options.basePath ), options.encoding ) );
-        }
-        data.bundle = buffer.join("\n") + "\n";
+        var do_next = function do_next() {
+            if ( i >= count )
+            {
+                data.bundle = buffer.join("\n") + "\n";
+                evt.next( );
+            }
+            else
+            {
+                filename = bundleFiles[i++];
+                if (!filename.length) return do_next( );
+                read_async( get_real_path( filename, options.basePath ), options.encoding, function(err, data){
+                    if ( !err ) buffer.push(data);
+                    do_next( );
+                } );
+            }
+        };
+        do_next( );
     }
-    evt.next( );
+    else
+    {
+        evt.next( );
+    }
 }
 ,action_out: function( evt ) {
     var params = evt.data, 
@@ -933,67 +1018,76 @@ Beeld[PROTO].loadPlugins = function( plugins, basePath ) {
                 filename = get_real_path(filename, basePath);
             plugin = require( filename );
             loader = plugin[ 'beeld_plugin_' + plg[0] ];
-            loader( self );
+            if ( 'function' === typeof loader ) loader( self );
         }
     }
     return self;
 };
 
 // parse input arguments, options and configuration settings
-Beeld[PROTO].parse = function( ) {
+Beeld[PROTO].parse = function( doneCb ) {
     var params, config, options,  
         configurationFile, configFile, encoding,
-        ext, parser;
+        ext, parser, self = this;
     
     params = Beeld.Obj();
     options = parse_options({
         'help' : false,
         'config' : false,
         'tasks' : false,
-        'enc' : 'utf8'
+        'enc' : 'utf8',
+        'compiler' : null
     }, ['config'], show_help_msg);
     
     //echo(JSON.stringify(options, null, 4));
     //exit(0);
     
-    configFile = realpath(options.config);
-    encoding = options.enc.toLowerCase();
-    // parse config settings
-    ext = file_ext(configFile).toLowerCase();
-    if ( !ext.length || !Beeld.Parsers[HAS](ext) ) ext = "*";
-    parser = Beeld.Parsers[ext];
-    configurationFile = read(configFile, encoding);
-    config = parser.parse( configurationFile );
-    config = config||{};
-    //echo(JSON.stringify(config, null, 4));
-    //exit(0);
-    params.options = Beeld.Obj({
-    'configFile': configFile,
-    'inputType': parser.name + ' (' + ext + ')',
-    'basePath': dirname(configFile),
-    'cwd': process.cwd( ),
-    'encoding': encoding,
-    'tasks': options.tasks ? options.tasks.split(',') : false
-    });
-    params.cmd_opts = options;
-    params.data = Beeld.Obj();
-    params.current = Beeld.Obj();
+    realpath_async(options.config, function(err, rpath){
+        if ( err ) throw err;
+        
+        configFile = rpath;
+        encoding = options.enc.toLowerCase();
+        // parse config settings
+        ext = file_ext(configFile).toLowerCase();
+        if ( !ext.length || !HAS.call(Beeld.Parsers,ext) ) ext = "*";
+        parser = Beeld.Parsers[ext];
+        read_async(configFile, encoding, function(err, data){
+            if ( err ) throw err;
+            
+            configurationFile = data;
+            config = parser.parse( configurationFile );
+            config = config||{};
+            //echo(JSON.stringify(config, null, 4));
+            //exit(0);
+            params.options = Beeld.Obj({
+            'configFile': configFile,
+            'inputType': parser.name + ' (' + ext + ')',
+            'basePath': dirname(configFile),
+            'cwd': process.cwd( ),
+            'encoding': encoding,
+            'tasks': options.tasks ? options.tasks.split(',') : false
+            });
+            params.cmd_opts = options;
+            params.data = Beeld.Obj();
+            params.current = Beeld.Obj();
 
-    if ( config[HAS]('settings') )
-    {
-        if ( !config['settings'][HAS]('RegExp') ) config['settings']['RegExp'] = false;
-        if ( !config['settings'][HAS]('Xpresion') ) config['settings']['Xpresion'] = false;
-    }
-    else
-    {
-        config['settings'] = {'RegExp':false, 'Xpresion':false};
-    }
-    if ( config[HAS]('plugins') )
-    {
-        this.loadPlugins(config.plugins, params.options.basePath);
-    }
-    params.config = config;
-    return params;
+            if ( HAS.call(config,'settings') )
+            {
+                if ( !HAS.call(config['settings'],'RegExp') ) config['settings']['RegExp'] = false;
+                if ( !HAS.call(config['settings'],'Xpresion') ) config['settings']['Xpresion'] = false;
+            }
+            else
+            {
+                config['settings'] = {'RegExp':false, 'Xpresion':false};
+            }
+            if ( HAS.call(config,'plugins') )
+            {
+                self.loadPlugins(config.plugins, params.options.basePath);
+            }
+            params.config = config;
+            if ( doneCb ) doneCb(params);
+        });
+    });
 };
 
 Beeld[PROTO].build = function( params ) {
@@ -1005,7 +1099,7 @@ Beeld[PROTO].build = function( params ) {
     params.data.tmp_in = null; 
     params.data.tmp_out = null;
     
-    if ( params.config[HAS]('tasks') )
+    if ( HAS.call(params.config,'tasks') )
     {
         params.config.tasks = Beeld.OrderedMap(params.config.tasks);
         while (params.config.tasks.hasNext())
@@ -1049,14 +1143,37 @@ Beeld[PROTO].build = function( params ) {
     params.data.tmp_in = tmpfile( ); 
     params.data.tmp_out = tmpfile( );
     
-    self.on('#actions', Beeld.Actions.next_task).pipeline('#actions', params, Beeld.Actions.abort);
+    while ( params.current.tasks && params.current.tasks.hasNext() )
+    {
+        var task = params.current.tasks.getNext();
+        self.on('#actions', Beeld.Actions.next_task);
+        var task_actions = Beeld.OrderedMap(task[1]);
+        self.on('#actions', Beeld.Actions.log);
+        // default header action
+        // is first file of src if exists
+        var src_action = task_actions.hasItemByKey('src');
+        if ( !task_actions.getItemByKey('header') && (-1 < src_action) )
+        {
+            self.on('#actions', Beeld.Actions.next_action);
+        }
+        while ( task_actions && task_actions.hasNext() )
+        {
+            var action = task_actions.getNext();
+            self.on('#actions', Beeld.Actions.next_action);
+        }
+        task_actions.rewind();
+    }
+    params.current.tasks.rewind();
+    self.on('#actions', Beeld.Actions.finish).pipeline('#actions', params, Beeld.Actions.abort);
     return self;
 };
 
 Beeld.Main = function( ) {
     var builder = new Beeld( );
     // do the process
-    builder.build( builder.parse() ); 
+    builder.parse(function(params){
+       builder.build( params ); 
+    });
 };
 
 // if called from command-line

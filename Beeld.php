@@ -6,7 +6,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-*   @version: 0.9.0
+*   @version: 1.0.0
 *
 **/
 if (!class_exists('Beeld'))
@@ -333,7 +333,8 @@ final class BeeldOrderedMap
             else
             {
                 $obj = $this->om[$this->index++];
-                $key = reset(array_keys($obj));
+                $keys = array_keys($obj);
+                $key = reset($keys);
                 return array($key, $obj[$key]);
             }
         }
@@ -631,10 +632,10 @@ final class BeeldActions
             if ( !$current->task_actions->getItemByKey('header') && (-1 < $src_action) )
             {
                 $src_cfg = $current->task_actions->getItemByKey('src');
-                array_splice($current->task_actions->om, $src_action, 0, array(array('header'=>$src_cfg[1][0])));
+                array_splice($current->task_actions->om, $src_action+1, 0, array(array('header'=>$src_cfg[1][0])));
             }
             
-            $pipeline->on('#actions', array('BeeldActions','log'));
+            /*$pipeline->on('#actions', array('BeeldActions','log'));
             
             while ($current->task_actions->hasNext())
             {
@@ -650,13 +651,14 @@ final class BeeldActions
             else 
             {
                 $pipeline->on('#actions', array('BeeldActions','finish'));
-            }
+            }*/
             
             $evt->next( );
         }
         else
         {
-            BeeldActions::finish( $evt );
+            //BeeldActions::finish( $evt );
+            $evt->next( );
         }
     }
                 
@@ -843,7 +845,7 @@ final class BeeldActions
 // extends/implements PublishSubscribe
 class Beeld extends PublishSubscribe
 {
-    const VERSION = "0.9.0";
+    const VERSION = "1.0.0";
     public static $Parsers = null;
     
     public $actions = null;
@@ -966,7 +968,7 @@ class Beeld extends PublishSubscribe
                     $filename = BeeldUtils::get_real_path($filename, $basePath);
                 require_once($filename);
                 $loader = 'beeld_plugin_' . $plg[0];
-                call_user_func( $loader, $this );
+                if ( is_callable($loader) ) call_user_func( $loader, $this );
             }
         }
         return $this;
@@ -981,7 +983,8 @@ class Beeld extends PublishSubscribe
             'help' => false,
             'config' => false,
             'tasks' => false,
-            'enc' => 'utf8'
+            'enc' => 'utf8',
+            'compiler' => null
         ), array('config'), array('BeeldUtils', 'show_help_msg'));
         
         //print_r($options);
@@ -1043,7 +1046,8 @@ class Beeld extends PublishSubscribe
             while ($params->config['tasks']->hasNext())
             {
                 $task = $params->config['tasks']->getNext(true);
-                $task_name = reset(array_keys($task));
+                $task_keys = array_keys($task);
+                $task_name = reset($task_keys);
                 $tasks[] = $task;
                 if ( $params->options->tasks && in_array($task_name, $params->options->tasks) )
                 {
@@ -1082,7 +1086,28 @@ class Beeld extends PublishSubscribe
         $params->data->tmp_in = BeeldUtils::tmpfile( );
         $params->data->tmp_out = BeeldUtils::tmpfile( );
         
-        $this->on('#actions', array('BeeldActions', 'next_task'))->pipeline('#actions', $params, array('BeeldActions', 'abort'));
+        while ( $params->current->tasks && $params->current->tasks->hasNext() )
+        {
+            $task = $params->current->tasks->getNext();
+            $this->on('#actions', array('BeeldActions', 'next_task'));
+            $task_actions = Beeld::OrderedMap($task[1]);
+            $this->on('#actions', array('BeeldActions','log'));
+            // default header action
+            // is first file of src if exists
+            $src_action = $task_actions->hasItemByKey('src');
+            if ( !$task_actions->getItemByKey('header') && (-1 < $src_action) )
+            {
+                $this->on('#actions', array('BeeldActions','next_action'));
+            }
+            while ( $task_actions && $task_actions->hasNext() )
+            {
+                $action = $task_actions->getNext();
+                $this->on('#actions', array('BeeldActions','next_action'));
+            }
+            $task_actions->rewind();
+        }
+        $params->current->tasks->rewind();
+        $this->on('#actions', array('BeeldActions','finish'))->pipeline('#actions', $params, array('BeeldActions', 'abort'));
         return $this;
     }
     

@@ -5,7 +5,7 @@
 #   https://github.com/foo123/Beeld
 #
 #   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-#   @version: 0.9.0
+#   @version: 1.0.0
 #
 ##
 
@@ -176,6 +176,7 @@ def parse_options( defaults, required=None ):
         parser.add_argument('--config', help="configuration file (REQUIRED)", metavar="FILE")
         parser.add_argument('--tasks', help="specific tasks to run separated by commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
         parser.add_argument('--enc', help="set text encoding \nDEFAULT: utf-8", metavar="ENCODING", default=defaults['enc'])
+        parser.add_argument('--compiler', help="compiler used \nDEFAULT: uglifyjs", metavar="COMPILER", default=defaults['compiler'])
         options, remainder = parser.parse_known_args()
 
     else:
@@ -183,6 +184,7 @@ def parse_options( defaults, required=None ):
         parser.add_option('--config', help="configuration file (REQUIRED)", metavar="FILE")
         parser.add_option('--tasks', dest='tasks', help="specific tasks to run separated by commas (OPTIONAL) \nDEFAULT: all tasks defined in config file", default=defaults['tasks'])
         parser.add_option('--enc', dest='enc', help="set text encoding \nDEFAULT: utf-8", metavar="ENCODING", default=defaults['enc'])
+        parser.add_option('--compiler', dest='compiler', help="compiler used \nDEFAULT: uglifyjs", metavar="COMPILER", default=defaults['compiler'])
         options, remainder = parser.parse_args()
 
     is_valid = True
@@ -452,21 +454,22 @@ class BeeldActions:
                 src_cfg = current.task_actions.getItemByKey('src')
                 current.task_actions.om.insert(src_action+1,{'header':src_cfg[1][0]})
             
-            pipeline.on('#actions', Beeld.Actions.log)
-            
-            while current.task_actions.hasNext():
-                current.task_actions.getNext()
-                pipeline.on('#actions', Beeld.Actions.next_action)
-            current.task_actions.rewind( )
-            
-            if current_tasks.hasNext():
-                pipeline.on('#actions', Beeld.Actions.next_task)
-            else: 
-                pipeline.on('#actions', Beeld.Actions.finish)
+            #pipeline.on('#actions', Beeld.Actions.log)
+            #
+            #while current.task_actions.hasNext():
+            #    current.task_actions.getNext()
+            #    pipeline.on('#actions', Beeld.Actions.next_action)
+            #current.task_actions.rewind( )
+            #
+            #if current_tasks.hasNext():
+            #    pipeline.on('#actions', Beeld.Actions.next_task)
+            #else: 
+            #    pipeline.on('#actions', Beeld.Actions.finish)
             
             evt.next( )
         else:
-            Beeld.Actions.finish( evt )
+            #Beeld.Actions.finish( evt )
+            evt.next( )
                 
     #def action_initially(evt):
     #    evt.next()
@@ -694,7 +697,7 @@ Xpresion.defRuntimeFunc({
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
     
-    VERSION = "0.9.0"
+    VERSION = "1.0.0"
     
     ROOT      = BEELD_ROOT
     INCLUDES  = BEELD_INCLUDES
@@ -761,7 +764,7 @@ class Beeld(PublishSubscribe):
                 else:
                     filename = get_real_path( filename, basePath )
                 loader = getattr(import_path(filename), 'beeld_plugin_' + plg[0])
-                loader( self )
+                if callable(loader): loader( self )
         
         return self
     
@@ -776,7 +779,8 @@ class Beeld(PublishSubscribe):
             'help' : False,
             'config' : False,
             'tasks' : False,
-            'enc' : 'utf-8'
+            'enc' : 'utf-8',
+            'compiler': None
         }, ['config'])
         
         #pprint.pprint(options)
@@ -859,7 +863,24 @@ class Beeld(PublishSubscribe):
         params.data.tmp_in = tmpfile( )
         params.data.tmp_out = tmpfile( )
         
-        self.on('#actions', Beeld.Actions.next_task).pipeline('#actions', params, Beeld.Actions.abort)
+        while params.current.tasks and params.current.tasks.hasNext():
+            task = params.current.tasks.getNext()
+            self.on('#actions', Beeld.Actions.next_task)
+            task_actions = Beeld.OrderedMap(task[1])
+            self.on('#actions', Beeld.Actions.log)
+            # default header action
+            # is first file of src if exists
+            src_action = task_actions.hasItemByKey('src')
+            if (not task_actions.getItemByKey('header')) and (-1 < src_action):
+                self.on('#actions', Beeld.Actions.next_action);
+            while task_actions and task_actions.hasNext():
+                action = task_actions.getNext()
+                self.on('#actions', Beeld.Actions.next_action)
+            
+            task_actions.rewind()
+        
+        params.current.tasks.rewind()
+        self.on('#actions', Beeld.Actions.finish).pipeline('#actions', params, Beeld.Actions.abort)
         
         return self
         
