@@ -41,7 +41,7 @@ A generic UMD module pattern wrapper that supports module dependencies and bundl
 and in [this gist](https://gist.github.com/foo123/8b0c069445bee29b0e93) for single module wrapper (no dependencies)
 
 
-###Dependencies
+### Dependencies
 
 * `UglifyJS` (default), `Java Closure Compiler` (included), `Java YUI Compressor` (included), [`CSS Minifier`](http://foo123.github.io/examples/css-minifier) (included) can be used
 
