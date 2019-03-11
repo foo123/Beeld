@@ -3,7 +3,7 @@ Beeld
 
 **A scriptable, extendable and configurable source code builder framework and tool in Node.js / Python / PHP**
 
-**version 0.9.0**
+**version 1.0.0** (in progress)
 
 ![beeld is a bee that builds flowers](/beeld.jpg)
 
