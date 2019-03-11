@@ -97,7 +97,7 @@ var PROTO = 'prototype', HAS = Object.prototype.hasOwnProperty,
     unlink_async = function( file ) {
         if ( file )
         {
-            /*fs.exists(file, function(yes){ if ( yes )*/ fs.unlink(file/*, function(err){ }*/); /*});*/
+            /*fs.exists(file, function(yes){ if ( yes )*/ fs.unlink(file, function(err){ }); /*});*/
         }
     },
     
@@ -618,14 +618,12 @@ Beeld.Actions = {
     var params = evt.data,
         current = params.current,
         task_actions = current.task_actions;
-    //console.log('next_action');
     if ( task_actions && task_actions.hasNext() )
     {
         var a = task_actions.getNext(), 
             action = 'action_' + a[0];
         if ( HAS.call(current.actions,action) )
         {
-            //console.log('next_action = '+a[0]);
             current.action = a[0];
             current.action_cfg = a[1];
             current.actions[ action ]( evt );
@@ -648,7 +646,6 @@ Beeld.Actions = {
         current_tasks = current.tasks,
         pipeline = params.pipeline
         ;
-    //console.log('next_task');
     if ( current_tasks && current_tasks.hasNext() )
     {
         var task = current_tasks.getNext();
@@ -657,7 +654,6 @@ Beeld.Actions = {
         current.task_actions = Beeld.OrderedMap(task[1]);
         current.action = '';
         current.action_cfg = null;
-        //console.log('next_task = '+task[0]);
         
         data.bundle = ''; 
         data.header = ''; 
@@ -791,12 +787,10 @@ Beeld.Actions = {
     
     if ( headerFile && headerFile.length )
     {
-        //console.log(headerFile);
-        read_async( get_real_path( headerFile, options.basePath ), options.encoding, function(err, data){
-            //console.log('header read');
+        read_async( get_real_path( headerFile, options.basePath ), options.encoding, function(err, text){
             if ( !err )
             {
-                headerText = data;
+                headerText = text;
                 if ( headerText && headerText.length )
                 {
                     if ( startsWith(headerText, '/**') )

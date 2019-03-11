@@ -3,7 +3,7 @@ Beeld
 
 **A scriptable, extendable and configurable source code builder framework and tool in Node.js / Python / PHP**
 
-**version 1.0.0** (in progress)
+**version 1.0.0**
 
 ![beeld is a bee that builds flowers](/beeld.jpg)
 
@@ -22,7 +22,7 @@ Also the sample-config files and build.bat, build.sh files, demonstrate how the 
 
 ### Plugins, Extensions, Scripting, Custom Dynamic Expressions
 
-The framework can be extended by plugins. The plugin code can be in the Beeld/plugins folder or even in current working directory. Each plugin can define a new action to be used on the source data through a pipeline.
+The framework can be extended by plugins. The plugin code can be in the `Beeld/plugins` folder or even in current working directory. Each plugin can define a new action to be used on the source data through a pipeline.
 
 The plugin and the new action are both defined in each config file (see sample config files).
 
@@ -30,7 +30,7 @@ Furthermore the framework has a built-in `"replace"` action to replace text in s
 
 **NEW in version 0.8+**
 
-The framework allows custom powerfull dynamic expressions (and regular expressions) to be part of config data and parameters, via the [`Xpresion` framework](https://github.com/foo123/Xpresion). The `beeld.config` file can include a `settings` part which defines the prefixes for `Xpresion` dynamic expressions and Regular Expressions (if any) used in the config file. The parsing and evaluation will be automatic (see sample config files for examples). An common example of the use of custom expressions is the use of current date to be displayed in the final built file (one can use a custom expression for that which uses the `date` function as part of `replace` data to be replaced in the file where needed). Another one, is to replace data in the files not simply by another string but by the contents of a whole file (one would use an expression with the `file` function to load the contents of a file dynamicaly)
+The framework allows custom powerfull dynamic expressions (and regular expressions) to be part of config data and parameters, via the [`Xpresion` framework](https://github.com/foo123/Xpresion). The `beeld.config` file can include a `settings` part which defines the prefixes for `Xpresion` dynamic expressions and `Regular Expressions` (if any) used in the config file. The parsing and evaluation will be automatic (see sample config files for examples). A common example of the use of custom expressions is the use of current date to be displayed in the final built file (one can use a custom expression for that which uses the `date` function as part of `replace` data to be replaced in the file where needed). Another one, is to replace data in the files not simply by another string but by the contents of a whole file (one would use an expression with the `file` function to load the contents of a file dynamicaly)
 
 
 
@@ -46,29 +46,30 @@ and in [this gist](https://gist.github.com/foo123/8b0c069445bee29b0e93) for sing
 * `UglifyJS` (default), `Java Closure Compiler` (included), `Java YUI Compressor` (included), [`CSS Minifier`](http://foo123.github.io/examples/css-minifier) (included) can be used
 
 __For Python__
-* Python (2 or 3)
+* `Python` (2 or 3)
 * `PyYaml` module installed (for Yaml parsing)
 
 __For PHP__
-* PHP 5.2+
+* `PHP` 5.2+
 * Modified standalone version of `Symfony Yaml` parser by (c) Fabien Potencier <fabien@symfony.com> (included)
 
-__For Node__
-* Node 0.8+
+__For Node.js__
+* `Node.js` 0.8+
 * Modified standalone version of `yaml.js` (Symfony Yaml parser) by (c) Fabien Potencier, Jeremy Faivre (included)
 
 __Common Dependencies__
-* `UglifyJS2` package (global install)
-* `Closure` compiler (included)
-* `YUI Compressor` compiler (included)
-* `Java 6` (needed by YUI, Closure compilers)
-* `CSS Minifier` (python) (included)
-* `CSS Minifier` (php) (included)
-* `CSS Minifier` (node) (included)
-* `Xpresion` (python) (included)
-* `Xpresion` (php) (included)
-* `Xpresion` (node) (included)
+* `UglifyJS2` package (**required**, global install preferably)
+* `Closure` compiler (**included**)
+* `YUI Compressor` compiler (**included**)
+* `Java 6` (**required** by `YUI`, `Closure` compilers)
+* `CSS Minifier` (`python`) (**included**)
+* `CSS Minifier` (`php`) (**included**)
+* `CSS Minifier` (`node`) (**included**)
+* `Xpresion` (`python`) (**included**)
+* `Xpresion` (`php`) (**included**)
+* `Xpresion` (`node`) (**included**)
 
+**NOTE:** Only one of the three `javascript` minify compilers needs be used, but `Beeld` interfaces are provided for all three.
 
 *URL* [Nikos Web Development](http://nikos-web-development.netai.net/ "Nikos Web Development")  
 <!--*URL* [WorkingClassCode](http://workingclasscode.uphero.com/ "Working Class Code")-->
