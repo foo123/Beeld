@@ -9,7 +9,7 @@
 *   Original cssmin.py ported from YUI here https://github.com/zacharyvoase/cssmin 
 * 
 * Modified version of npp-cssmin adapted for Node 0.8+
-* v. 0.6
+* v. 1.0.0
 * @Nikos M.
 * 
 **/
@@ -28,10 +28,10 @@ else root[ moduleName ] = moduleDefinition();
 }(this, 'CSSMin', function( undef ) {
 "use strict";
 // the exported object
-var CSSMin = { VERSION : "0.6" };
+var CSSMin = { VERSION : "1.0.0" };
 
 var // node modules
-    isNode = 'undefined'!==typeof(global) && '[object global]' == {}.toString.call(global) && require,
+    isNode = ('undefined' !== typeof global) && ('[object global]' == {}.toString.call(global)) && ('function' === typeof require),
     fs, path, realpath, readFile, writeFile, exists, unLink, 
     dirname, pjoin, exit, 
     echo = console.log, echoStdErr = console.error,
@@ -60,13 +60,13 @@ var // utils
     clamp = function(v, m, M) { return max(min(v, M), m); },
     
     AP = Array.prototype, OP = Object.prototype, 
-    HAS = 'hasOwnProperty', concat = AP.concat, slice = AP.slice,
+    HAS = OP.hasOwnProperty, concat = AP.concat, slice = AP.slice,
     
     extend = function(o1, o2) { 
         o1 = o1 || {}; 
         for (var p in o2)
         { 
-            if ( o2[HAS](p) ) 
+            if ( HAS.call(o2,p) ) 
             { 
                 o1[p] = o2[p]; 
             } 
@@ -78,21 +78,20 @@ var // utils
     
     startsWith = function(s, p) { return (s && p == s.substr(0, p.length)); },
     
-    trim = function(s) { return s.replace(/^\s+/gm, '').replace(/\s+$/gm, ''); },
+    trim_re = /^\s+|\s+$/gm,
+    trim = function(s) { return s.replace(trim_re, ''); },
     
     trimd = function(s, delim) { 
         var r1, r2;
         if (delim)
         {
-            r1 = new RegExp('^['+esc(delim+'')+']+', 'gm');
-            r2 = new RegExp('['+esc(delim+'')+']+$', 'gm');
+            r = new RegExp('^['+esc(delim+'')+']+'+'|'+'['+esc(delim+'')+']+$', 'gm');
         }
         else
         {
-            r1 = /^\s+/gm;
-            r2 = /\s+$/gm;
+            r = trim_re;
         }
-        return s.replace(r1, '').replace(r2, '');
+        return s.replace(r, '');
     },
     
     str_replace = function(r1, r2, s) {
@@ -103,7 +102,10 @@ var // utils
         else if ( 2 == arguments.length )
         {
             for (var k in r1)
+            {
+                if ( !HAS.call(r1, k) ) continue;
                 r2 = r2.split( k ).join( r1[k] );
+            }
             return r2;
         }
         return r1;
@@ -216,8 +218,8 @@ CSSMin.Config = {
         },
 
         'leadingSpaceOrCommas': /^[\s,]+/,
-        'hsla': /\b(hsla?)\b\s*\(([^\)]+)\)/gmi,
-        'rgba': /\b(rgba?)\b\s*\(([^\)]+)\)/gmi,
+        'hsla': /\b(hsla?)\b\s*\(([^\(\)]+)\)/gmi,
+        'rgba': /\b(rgba?)\b\s*\(([^\(\)]+)\)/gmi,
         'pseudoclasscolon': /(^|\})(([^\{\:])+\:)+([^\{]*\{)/gm,
         'whitespace_start': /\s+([!{};:>+\(\)\],])/gm,
         'and': /\band\(/gmi,
@@ -718,7 +720,7 @@ Color.Keywords = {
     // http://www.w3.org/wiki/CSS/Properties/color/keywords
     // https://developer.mozilla.org/en-US/docs/Web/CSS/color_value
     /* extended */
-    'transparent'         : [  0,0,0        ,0]
+    'transparent'          : [  0,0,0        ,0]
     ,'aliceblue'           : [  240,248,255  ,1]
     ,'antiquewhite'        : [  250,235,215  ,1]
     ,'aqua'                : [  0,255,255    ,1]
@@ -873,8 +875,8 @@ var P2C = Color.P2C = 2.55;
 // color format regexes
 Color.hexieRE = /^#([0-9a-fA-F]{8})\b/;
 Color.hexRE = /^#([0-9a-fA-F]{3,6})\b/;
-Color.rgbRE = /^(rgba?)\b\s*\(([^\)]*)\)/i;
-Color.hslRE = /^(hsla?)\b\s*\(([^\)]*)\)/i;
+Color.rgbRE = /^(rgba?)\b\s*\(([^\(\)]*)\)/i;
+Color.hslRE = /^(hsla?)\b\s*\(([^\(\)]*)\)/i;
 Color.keywordRE = new RegExp('^(' + Object.keys(Color.Keywords).map(esc).join('|') + ')\\b', 'i');
 Color.colorstopRE = /^\s+(\d+(\.\d+)?%?)/;
 // color format conversions
@@ -1294,7 +1296,7 @@ Color.prototype = {
     },
     
     fromHSL: function(hsl) {
-        rgb = hsl2rgb(hsl[0]||0, hsl[1]||0, hsl[2]||0);
+        var rgb = hsl2rgb(hsl[0]||0, hsl[1]||0, hsl[2]||0);
         
         this.col[0] = rgb[0];
         this.col[1] = rgb[1];
@@ -1713,11 +1715,13 @@ Processor.prototype = {
     convert_hsl2rgb: function(css) {
         var rx = CSSMin.Config.Regex.hsla, m, hsl, rgb;
         
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) ) 
         {
             hsl = Color.get( [ m[1], m[2] ], 0, 'hsl' );
             rgb = hsl.toString('rgba');
-            css = str_replace(m[0], rgb, css);
+            //css = str_replace(m[0], rgb, css);
+            css = css.slice(0, m.index) + rgb + css.slice(m.index+m[0].length);
             rx.lastIndex = m.index + rgb.length;
         }
         return css;
@@ -1726,13 +1730,15 @@ Processor.prototype = {
     convert_rgb2hex: function(css, force) {
         var rx = CSSMin.Config.Regex.rgba, m, rgb, hex;
         
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) ) 
         {
             rgb = Color.get( [ m[1], m[2] ], 0, 'rgb' );
             if ( force || !rgb.isTransparent() )
             {
                 hex = rgb.toString('hex');
-                css = str_replace(m[0], hex, css);
+                //css = str_replace(m[0], hex, css);
+                css = css.slice(0, m.index) + hex + css.slice(m.index+m[0].length);
                 rx.lastIndex = m.index + hex.length;
             }
         }
@@ -1801,10 +1807,12 @@ Processor.prototype = {
         **/
         
         var rx = CSSMin.Config.Regex.pseudoclasscolon, m, rep;
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) )
         {
             rep = m[0].split( ":" ).join( "___PSEUDOCLASSCOLON___" );
-            css = str_replace(m[0], rep, css);
+            //css = str_replace(m[0], rep, css);
+            css = css.slice(0, m.index) + rep + css.slice(m.index+m[0].length);
             rx.lastIndex = m.index + rep.length;
         }
         return css;
@@ -1871,14 +1879,16 @@ Processor.prototype = {
         // """Shorten colors from #AABBCC to #ABC where possible."""
         
         var rx = CSSMin.Config.Regex.hex_color,  m, first, second, rep;
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) )
         {
             first = m[3] + m[5] + m[7];
             second = m[4] + m[6] + m[8];
             if ( first.toLowerCase() == second.toLowerCase() )
             {
-                rep = m[1] + m[2] + '#' + first;
-                css = str_replace(m[0], rep, css);
+                rep = m[1] + m[2] + '#' + first.toLowerCase();
+                //css = str_replace(m[0], rep, css);
+                css = css.slice(0, m.index) + rep + css.slice(m.index+m[0].length);
                 rx.lastIndex = m.index + rep.length;
             }
         }
@@ -1919,6 +1929,7 @@ Processor.prototype = {
     extract_urls: function(css) {
         // handle (relative) image/font urls in CSS
         var rx = CSSMin.Config.Regex.url, urls = [], tmp = [], m;
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) ) tmp.push( m[1] );
         
         if ( tmp.length )
@@ -2022,11 +2033,13 @@ Processor.prototype = {
     
     remove_multiple_charset: function(css) {
         var rx = CSSMin.Config.Regex.charset, charset = null, times = 0, m;
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) )
         {
             times++;
             if ( 1 == times) charset = m[0];
-            css = str_replace(m[0], ' ', css);
+            //css = str_replace(m[0], ' ', css);
+            css = css.slice(0, m.index) + ' ' + css.slice(m.index+m[0].length);
             rx.lastIndex = m.index+1;
         }
         
@@ -2043,6 +2056,7 @@ Processor.prototype = {
         ;
         i = 0;
         rx = CSSMin.Config.Vendor.Regex['values'];
+        rx.lastIndex = 0;
         while ( m = rx.exec(val) )
         {
             v = m[3].toLowerCase();
@@ -2053,7 +2067,8 @@ Processor.prototype = {
                 prefix = prefixes[pre1][1];
                 id = '__[[value_'+i+']]__';
                 rep = m[1] + m[2] + id + m[4];
-                val = str_replace(m[0], rep + ' ', val);
+                //val = str_replace(m[0], rep + ' ', val);
+                val = val.slice(0, m.index) + rep + ' ' + val.slice(m.index+m[0].length);
                 rv[id] = prefix + m[3];
                 rx.lastIndex = m.index + rep.length;
             }
@@ -2069,6 +2084,7 @@ Processor.prototype = {
         ;
         i = 0;
         rx = CSSMin.Config.Vendor.Regex['explicit'];
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) )
         {
             p = m[4].toLowerCase();
@@ -2103,6 +2119,7 @@ Processor.prototype = {
         ;
         i = 0;
         rx = CSSMin.Config.Vendor.Regex['properties'];
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) ) 
         {
             p = m[4].toLowerCase();
@@ -2149,6 +2166,7 @@ Processor.prototype = {
         ;
         i = 0;
         rx = CSSMin.Config.Vendor.Regex['atrules'];
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) ) 
         {
             p = m[4].toLowerCase();
@@ -2245,11 +2263,12 @@ Processor.prototype = {
     
     gradient_polyfills: function(css) {
         var rx = CSSMin.Config.Vendor.Regex['polyfills']['gradient'], 
-            m, prefix, prop, grad, gradbody, dir, colors, col, polyfills,
+            m, c, prefix, prop, grad, gradbody, dir, colors, col, polyfills,
             replacements = {}, rep, id, i = 0;
         polyfills = CSSMin.Config.Vendor['polyfills'];
         var leadingSpaceOrCommas = CSSMin.Config.Regex['leadingSpaceOrCommas'];
         
+        rx.lastIndex = 0;
         while ( m = rx.exec(css) ) 
         {
             prefix = m[1];
@@ -2283,12 +2302,15 @@ Processor.prototype = {
             id = '__[[grad_'+i+']]__';
             rep = m[1] + id + ('}'==m[5]?'}':'');
             replacements[id] = [m[0], prefix, prop, grad, gradbody, dir, colors];
-            css = str_replace(m[0], rep, css);
+            //css = str_replace(m[0], rep, css);
+            css = css.slice(0, m.index) + rep + css.slice(m.index+m[0].length);
             rx.lastIndex = m.index + rep.length;
         }
         
         for (id in replacements)
         {
+            if ( !HAS.call(replacements, id) ) continue;
+            
             var repl = replacements[id], 
                 prop = repl[2],
                 propspecial = 'background-image' == prop ? 'background-color' : prop,

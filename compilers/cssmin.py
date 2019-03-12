@@ -9,7 +9,7 @@
 #  Original cssmin.py ported from YUI here https://github.com/zacharyvoase/cssmin 
 #
 #  Modified standalone version for Python 2.x, 3.x
-#  v. 0.6
+#  v. 1.0.0
 #  @Nikos M.
 #
 ###
@@ -38,14 +38,14 @@ except ImportError:
 
 class CSSMin:
     
-    VERSION = "0.6"
+    VERSION = "1.0.0"
 
 
 def map(f, a):
-    return list([f(x) for x in a])
+    return [f(x) for x in a]
 
 def asstring(a):
-    return list([str(x) for x in a])
+    return [str(x) for x in a]
     
 def compute_vendor_values():
     return re.compile(r'(^|\s|:|,)(\s*)(' + ('|').join( map( re.escape, list( CSSMin.Config['Vendor']['values'].keys() ) ) ) + ')($|;|\s|,)', re.M|re.I|re.S)
@@ -74,8 +74,8 @@ Config = {
         'compute_vendor_atrules' : compute_vendor_atrules,
 
         'trimSpaceCommaRE' : re.compile(r'^[\s,]+'),
-        'hsla' : re.compile(r'\b(hsla?)\s*\(([^\)]+)\)', re.M|re.I|re.S),
-        'rgba' :  re.compile(r'\b(rgba?)\s*\(([^\)]+)\)', re.M|re.I|re.S),
+        'hsla' : re.compile(r'\b(hsla?)\s*\(([^\(\)]+)\)', re.M|re.I|re.S),
+        'rgba' :  re.compile(r'\b(rgba?)\s*\(([^\(\)]+)\)', re.M|re.I|re.S),
         'pseudoclasscolon' :  re.compile(r"(^|\})(([^\{\:])+\:)+([^\{]*\{)"),
         'whitespace_start' :  re.compile(r"\s+([!{};:>+\(\)\],])"),
         '_and' :  re.compile(r"\band\(", re.I),
@@ -326,16 +326,19 @@ C2P = 100/255
 P2C = 2.55
 
 def col2per(c, suffix=None):
+    global C2P
     if suffix:
         return str(c*C2P)+str(suffix)
     else:
         return c*C2P
         
 def per2col(c):
+    global P2C
     return c*P2C
 
 # color format conversions
 def rgb2hex(r, g, b, asPercent=False):
+    global P2C
     if asPercent:
         r = clamp(round(r*P2C), 0, 255)
         g = clamp(round(g*P2C), 0, 255)
@@ -350,6 +353,7 @@ def rgb2hex(r, g, b, asPercent=False):
     return hex
 
 def rgb2hexIE(r, g, b, a, asPercent=False):
+    global P2C
     if asPercent:
         r = clamp(round(r*P2C), 0, 255)
         g = clamp(round(g*P2C), 0, 255)
@@ -493,7 +497,7 @@ class Color:
     
     Keywords = {
         # extended
-        'transparent'         : [  0,0,0        ,0]
+        'transparent'          : [  0,0,0        ,0]
         ,'aliceblue'           : [  240,248,255  ,1]
         ,'antiquewhite'        : [  250,235,215  ,1]
         ,'aqua'                : [  0,255,255    ,1]
@@ -647,8 +651,8 @@ class Color:
     P2C = P2C
     hexieRE = re.compile(r'^#([0-9a-fA-F]{8})\b')
     hexRE = re.compile(r'^#([0-9a-fA-F]{3,6})\b')
-    rgbRE = re.compile(r'^\b(rgba?)\b\s*\(([^\)]*)\)', re.I)
-    hslRE = re.compile(r'^\b(hsla?)\b\s*\(([^\)]*)\)', re.I)
+    rgbRE = re.compile(r'^\b(rgba?)\b\s*\(([^\(\)]*)\)', re.I)
+    hslRE = re.compile(r'^\b(hsla?)\b\s*\(([^\(\)]*)\)', re.I)
     keywordRE = None
     colorstopRE = re.compile(r'^\s+(\d+(\.\d+)?%?)')
     
@@ -798,7 +802,6 @@ class Color:
                 self.kword = kword
             
         
-        print (kword, self.col)
         return self
         
     def fromHEX(self, hex, asCSSString=None):
@@ -836,7 +839,6 @@ class Color:
             self.col[2] = clamp(int(hex[2], 16), 0, 255)
             self.col[3] = 1
         
-        print (hex, self.col)
         return self
     
     def fromRGB(self, rgb, asCSSString=None):
@@ -890,7 +892,6 @@ class Color:
             if len(col)>=4: self.col[3] = clamp(rgb[3], 0, 1)
             else:  self.col[3] = 1
 
-        print (rgb, self.col)
         return self
     
     def fromHSL(self, hsl, asCSSString=None):
@@ -947,7 +948,6 @@ class Color:
             if len(hsl)>=4: self.col[3] = clamp(hsl[3], 0, 1)
             else:  self.col[3] = 1
         
-        print (hsl, self.col)
         return self
     
     def toKeyword(self, asCSSString=None, withTransparency=False):
@@ -966,7 +966,7 @@ class Color:
         if asCSSString:
         
             if noTransparency or 1 == self.col[3]:
-                return 'rgb(' + (',').join( asstring(self.col[0:2]) ) + ')'
+                return 'rgb(' + (',').join( asstring(self.col[0:3]) ) + ')'
             else:
                 return 'rgba(' + (',').join( asstring(self.col) ) + ')'
         
@@ -1312,10 +1312,10 @@ class Processor:
         offset = 0
         m = rx.search(css, offset)
         while m:
-            print ([ m.group(1), m.group(2) ])
             hsl.fromHSL( [ m.group(1), m.group(2) ], 'parsed' )
             rgb = hsl.toString('rgba')
-            css = str_replace(m.group(0), rgb, css)
+            #css = str_replace(m.group(0), rgb, css)
+            css = css[0:m.start()] + rgb + css[m.start()+len(m.group(0)):]
             offset = m.start() + len(rgb)
             m = rx.search(css, offset)
         
@@ -1327,11 +1327,11 @@ class Processor:
         offset = 0
         m = rx.search(css, offset)
         while m:
-            print ([ m.group(1), m.group(2) ])
             rgb.fromRGB( [ m.group(1), m.group(2) ], 'parsed' )
             if force or not rgb.isTransparent():
                 hex = rgb.toString('hex')
-                css = str_replace(m.group(0), hex, css)
+                #css = str_replace(m.group(0), hex, css)
+                css = css[0:m.start()] + hex + css[m.start()+len(m.group(0)):]
                 offset = m.start() + len(hex)
             else:
                 #bypass
@@ -1387,7 +1387,8 @@ class Processor:
         m = rx.search(css, offset)
         while m:
             rep = str_replace(":", "___PSEUDOCLASSCOLON___", m.group(0))
-            css = str_replace(m.group(0), rep, css)
+            #css = str_replace(m.group(0), rep, css)
+            css = css[0:m.start()] + rep + css[m.start()+len(m.group(0)):]
             offset = m.start() + len(rep)
             m = rx.search(css, offset)
         return css
@@ -1454,8 +1455,9 @@ class Processor:
             second = m.group(4) + m.group(6) + m.group(8)
             if first.lower() == second.lower():
             
-                rep = m.group(1) + m.group(2) + '#' + first
-                css = str_replace(m.group(0), rep, css)
+                rep = m.group(1) + m.group(2) + '#' + first.lower()
+                #css = str_replace(m.group(0), rep, css)
+                css = css[0:m.start()] + rep + css[m.start()+len(m.group(0)):]
                 offset = m.start() + len(rep)
             else:
                 offset = m.end()
@@ -1586,7 +1588,8 @@ class Processor:
             
             times += 1
             if 1 == times: charset = m.group()
-            css = str_replace(m.group(0), ' ', css)
+            #css = str_replace(m.group(0), ' ', css)
+            css = css[0:m.start()] + ' ' + css[m.start()+len(m.group(0)):]
             offset = m.start() + 1
             m = rx.search(css, offset)
         
@@ -1611,7 +1614,8 @@ class Processor:
                 prefix = prefixes[pre1][1]
                 id = '__[[value_'+str(i)+']]__'
                 rep = m.group(1) + m.group(2) + id + m.group(4)
-                val = str_replace(m.group(0), rep + ' ', val)
+                #val = str_replace(m.group(0), rep + ' ', val)
+                val = val[0:m.start()] + rep + ' ' + val[m.start()+len(m.group(0)):]
                 rv[id] = prefix + m.group(3)
                 offset = m.start() + len(rep)
             else:
@@ -1799,7 +1803,6 @@ class Processor:
                 
                 i += 1
                 gradbody = re.sub(_tr, '', m.group(4)).lower()
-                print(gradbody)
                 dir = Gradient.parseDirection( gradbody )
                 if dir:
                 
@@ -1807,7 +1810,6 @@ class Processor:
                     gradbody = gradbody[dir[2]:]
                     dir = dir[0]
                 
-                print(gradbody)
                 col = 0
                 colors = []
                 c = Color.parse( gradbody, 1 )
@@ -1819,13 +1821,13 @@ class Processor:
                     colors.append( c[0] )
                     c = Color.parse( gradbody, 1 )
                 
-                print(gradbody)
                 id = '__[[grad_'+str(i)+']]__'
                 if '}'==m.group(5): mend = '}'
                 else: mend = ''
                 rep = m.group(1) + id + mend
                 replacements[id] = [m.group(0), prefix, prop, grad, gradbody, dir, colors]
-                css = str_replace(m.group(0), rep, css)
+                #css = str_replace(m.group(0), rep, css)
+                css = css[0:m.start()] + rep + css[m.start()+len(m.group(0)):]
                 offset = m.start() + len(rep)
             
             else:

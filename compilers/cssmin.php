@@ -10,9 +10,11 @@
 *  Original cssmin.py ported from YUI here https://github.com/zacharyvoase/cssmin 
 *
 *  Modified version of npp-cssmin adapted for PHP 5.2+
-*  v. 0.5.5
+*  v. 1.0.0
 *  @Nikos M.
 *
+*  NOTE: Does not yet support all vendor prefixes like js cssmin compiler does, 
+*  use js cssmin or py cssmin compiler instead if you need those
 **/
 
 error_reporting(E_ALL);
@@ -191,8 +193,8 @@ function CSSMin_regex_vendor_property($p) { return '/(^|;|\{)(\s*)((' . preg_quo
 function CSSMin_regex_vendor_atrule($p) { return '/(^|;|\{|\})(\s*)(@(' . preg_quote($p, '/') . ')\s+([0-9a-zA-Z_\-]+)\s*\{)/miS'; }
 
 $CSSMin_Regex = (object)array(
-    'hsla'=> '/\b(hsla|hsl)\s*\(([^\)]+)\)/miS',
-    'rgba'=> '/\b(rgba|rgb)\s*\(([^\)]+)\)/miS',
+    'hsla'=> '/\b(hsla|hsl)\s*\(([^\(\)]+)\)/miS',
+    'rgba'=> '/\b(rgba|rgb)\s*\(([^\(\)]+)\)/miS',
     'pseudoclasscolon'=> '/(^|\})(([^\{\:])+\:)+([^\{]*\{)/',
     'whitespace_start'=> '/\s+([!{};:>+\(\)\],])/',
     '_and'=> '/\band\(/i',
@@ -204,24 +206,24 @@ $CSSMin_Regex = (object)array(
     'zero_units'=> '/([\s:])(0)(px|rem|em|%|in|cm|mm|pc|pt|ex)/i', /* ms|s seems to cause animation issues */
     'floating_points'=> '/(:|\s|,)0+\.(\d+)/',
     'hex_color'=> '/([^"\'=\s])(\s*)#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])/',
-    'url'=> '#\burl\s*\(([^\)]+?)\)#i',
+    'url'=> '#\burl\s*\(([^\(\)]+?)\)#i',
     'charset'=> '/@charset [^;]+($|;)/mi',
     'vendor'=> array( 'value'=> array(), 'explicit'=> array(), 'property'=> array(), 'atrule'=> array() )
 );
 
 foreach (array_keys($CSSMin_vendor_prefixes['values']) as $p)
-    $CSSMin_Regex['vendor']['value'][$p] = CSSMin_regex_vendor_value($p);
+    $CSSMin_Regex->vendor['value'][$p] = CSSMin_regex_vendor_value($p);
 foreach (array_keys($CSSMin_vendor_prefixes['explicit']) as $p)
-    $CSSMin_Regex['vendor']['explicit'][$p] = CSSMin_regex_vendor_explicit($p);
+    $CSSMin_Regex->vendor['explicit'][$p] = CSSMin_regex_vendor_explicit($p);
 foreach (array_keys($CSSMin_vendor_prefixes['properties']) as $p)
-    $CSSMin_Regex['vendor']['property'][$p] = CSSMin_regex_vendor_property($p);
+    $CSSMin_Regex->vendor['property'][$p] = CSSMin_regex_vendor_property($p);
 foreach (array_keys($CSSMin_vendor_prefixes['atrules']) as $p)
-    $CSSMin_Regex['vendor']['atrule'][$p] = CSSMin_regex_vendor_value($p);
+    $CSSMin_Regex->vendor['atrule'][$p] = CSSMin_regex_vendor_value($p);
 
        
 class CSSMin
 {
-    const VERSION = "0.5.5";
+    const VERSION = "1.0.0";
     
     public $enc = false;
     public $input = false;
@@ -477,7 +479,8 @@ class CSSMin
             else
                 $rgb = 'rgb(' . implode(',', $rgb) . ')';
                 
-            $css = str_replace($m[0][0], $rgb . ' ', $css);
+            //$css = str_replace($m[0][0], $rgb . ' ', $css);
+            $css = substr($css, 0, $m[0][1]) . $rgb . substr($css, $m[0][1]+strlen($m[0][0]));
             $offset = $m[0][1] + strlen($rgb);
         }
         return $css;
@@ -492,14 +495,15 @@ class CSSMin
         $offset = 0;
         while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
         {
-            $isRGBA = 'rgba'==$m[1][0] || 'RGBA'==$m[1][0];
+            $isRGBA = 'rgba'==strtolower($m[1][0]);
             if ( $isRGBA ) 
             {
                 // bypass
                 $i++;
                 $id = '__[[rep_'.$i.']]__';
                 $rep[$id] = $m[0][0];
-                $css = str_replace( $m[0][0], $id . ' ', $css );
+                //$css = str_replace( $m[0][0], $id . ' ', $css );
+                $css = substr($css, 0, $m[0][1]) . $id . substr($css, $m[0][1]+strlen($m[0][0]));
                 $offset = $m[0][1] + strlen($id);
             }
             else
@@ -519,7 +523,8 @@ class CSSMin
                 else $b = floatval($b);
                 
                 $hex = CSSMin_rgb2hex($r, $g, $b);
-                $css = str_replace($m[0][0], $hex . ' ', $css);
+                //$css = str_replace($m[0][0], $hex . ' ', $css);
+                $css = substr($css, 0, $m[0][1]) . $hex . substr($css, $m[0][1]+strlen($m[0][0]));
                 $offset = $m[0][1] + strlen($hex);
             }
         }
@@ -596,7 +601,8 @@ class CSSMin
         while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) )
         {
             $rep = str_replace( ":", "___PSEUDOCLASSCOLON___", $m[0][0] );
-            $css = str_replace( $m[0][0], $rep, $css );
+            //$css = str_replace( $m[0][0], $rep, $css );
+            $css = substr($css, 0, $m[0][1]) . $rep . substr($css, $m[0][1]+strlen($m[0][0]));
             $offset = $m[0][1] + strlen($rep);
         }
         return $css;
@@ -682,10 +688,11 @@ class CSSMin
         {
             $first = $m[3][0] . $m[5][0] . $m[7][0];
             $second = $m[4][0] . $m[6][0] . $m[8][0];
-            if ( strtolower($first) == strtolower($second) )
+            if ( strtolower($first) === strtolower($second) )
             {
-                $rep = $m[1][0] . $m[2][0] . '#' . $first;
-                $css = str_replace($m[0][0], $rep, $css);
+                $rep = $m[1][0] . $m[2][0] . '#' . strtolower($first);
+                //$css = str_replace($m[0][0], $rep, $css);
+                $css = substr($css, 0, $m[0][1]) . $rep . substr($css, $m[0][1]+strlen($m[0][0]));
                 $offset = $m[0][1] + strlen($rep);
             }
             else
@@ -848,7 +855,8 @@ class CSSMin
         {
             $times++;
             if ( 1 == $times) $charset = $m[0][0];
-            $css = str_replace($m[0][0], '', $css);
+            //$css = str_replace($m[0][0], '', $css);
+            $css = substr($css, 0, $m[0][1]) . '' . substr($css, $m[0][1]+strlen($m[0][0]));
             $offset = $m[0][1];
         }
         
@@ -866,14 +874,15 @@ class CSSMin
         $i = 0;
         foreach ($values as $v)
         {
-            $rx = $CSSMin_Regex['vendor']['value'][$v];
+            $rx = $CSSMin_Regex->vendor['value'][$v];
             $offset = 0;
             while ( preg_match($rx, $val, $m, PREG_OFFSET_CAPTURE, $offset) ) 
             {
                 $i++;
                 $id = '__[[value_'.$i.']]__';
                 $rep = $m[1][0] . $m[2][0] . $id . $m[4][0];
-                $val = str_replace( $m[0][0], $rep . ' ', $val );
+                //$val = str_replace( $m[0][0], $rep . ' ', $val );
+                $val = substr($val, 0, $m[0][1]) . $rep . ' ' . substr($val, $m[0][1]+strlen($m[0][0]));
                 $rv[$id] = $prefix . $m[3][0];
                 $offset = $m[0][1] + strlen($rep);
             }
@@ -891,7 +900,7 @@ class CSSMin
         foreach ($expl as $p => $prefixes)
         {
             $l = count($prefixes);
-            $rx = $CSSMin_Regex['vendor']['explicit'][$p];
+            $rx = $CSSMin_Regex->vendor['explicit'][$p];
             $offset = 0;
             while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
             {
@@ -923,7 +932,7 @@ class CSSMin
         foreach ($props as $p => $prefixes)
         {
             $l = count($prefixes);
-            $rx = $CSSMin_Regex['vendor']['property'][$p];
+            $rx = $CSSMin_Regex->vendor['property'][$p];
             $offset = 0;
             while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
             {
@@ -963,7 +972,7 @@ class CSSMin
         foreach ($atrules as $p=>$prefixes)
         {
             $l = count($prefixes);
-            $rx = $CSSMin_Regex['vendor']['atrule'][$p];
+            $rx = $CSSMin_Regex->vendor['atrule'][$p];
             $offset = 0;
             while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
             {
