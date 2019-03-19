@@ -190,7 +190,11 @@ final class BeeldUtils
             }
             else if ( is_string($xpr) && self::startsWith($xpr, $settings['Xpresion']) )
             {
-                $xpr = new Xpresion( substr($xpr, strlen($settings['Xpresion'])) );
+                try {
+                    $xpr = new Xpresion( substr($xpr, strlen($settings['Xpresion'])) );
+                } catch (\RuntimeException $ex) {
+                    $xpr = null;
+                }
                 return $xpr;
             }
         }
@@ -198,7 +202,7 @@ final class BeeldUtils
     }
     
     public static function evaluate($xpr, $data) {
-        return $xpr instanceof Xpresion ? $xpr->evaluate($data) : $xpr;
+        return $xpr instanceof Xpresion ? $xpr->evaluate($data) : (string)$xpr;
     }
     
     /**
@@ -903,12 +907,10 @@ class Beeld extends PublishSubscribe
         // aliases
         self::$Parsers[".yaml"] = self::$Parsers[".yml"];
         self::$Parsers["*"] = self::$Parsers[".custom"];
-        Xpresion::defaultConfiguration();
-        Xpresion::defFunc(array(
-            'file'=> Xpresion::Func('file', '$Fn->file($0)'),
-            'tpl'=>  Xpresion::Func('tpl',  '$Fn->tpl($0)')
-        ));
-        Xpresion::defRuntimeFunc(array(
+        Xpresion::defaultConfiguration()->defFunc(array(
+            'file'=> array('input'=>'file', 'output'=>'$Fn->file(<$.0>)', 'otype'=>Xpresion::T_STR),
+            'tpl'=>  array('input'=>'tpl', 'output'=>'$Fn->tpl(<$.0>)', 'otype'=>Xpresion::T_STR)
+        ))->defRuntimeFunc(array(
             'file'=> array('BeeldUtils', 'read_file'),
             'tpl'=> array('BeeldUtils', 'get_tpl')
         ));

@@ -218,7 +218,11 @@ function xpresion( xpr, evt )
         }
         else if ( xpr.substr && startsWith(xpr, settings.Xpresion) )
         {
-            xpr = new Xpresion( xpr.substr(settings.Xpresion.length) );
+            try {
+                xpr = new Xpresion( xpr.substr(settings.Xpresion.length) );
+            } catch (e) {
+                xpr = null;
+            }
             return xpr;
         }
     }
@@ -227,7 +231,7 @@ function xpresion( xpr, evt )
 
 function evaluate( xpr, data ) 
 {
-    return xpr instanceof Xpresion ? xpr.evaluate(data) : xpr;
+    return xpr instanceof Xpresion ? xpr.evaluate(data) : String(xpr);
 }
 
 //
@@ -547,12 +551,10 @@ Beeld.Parsers = {
 // aliases
 Beeld.Parsers[".yaml"] = Beeld.Parsers[".yml"];
 Beeld.Parsers["*"] = Beeld.Parsers[".custom"];
-Xpresion.defaultConfiguration();
-Xpresion.defFunc({
-    'file': Xpresion.Func('file', 'Fn.file($0)'),
-    'tpl':  Xpresion.Func('tpl',  'Fn.tpl($0)')
-});
-Xpresion.defRuntimeFunc({
+Xpresion.defaultConfiguration().defFunc({
+    'file': {'input':'file', 'output':'Fn.file(<$.0>)', 'otype':Xpresion.T_STR},
+    'tpl':  {'input':'tpl', 'output':'Fn.tpl(<$.0>)', 'otype':Xpresion.T_STR}
+}).defRuntimeFunc({
     'file': read_file,
     'tpl': get_tpl
 });

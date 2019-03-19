@@ -161,12 +161,15 @@ def xpresion(xpr, evt):
         if isinstance(xpr,Xpresion):
             return xpr
         elif isinstance(xpr, str) and xpr.startswith(settings['Xpresion']):
-            xpr = Xpresion( xpr[len(settings['Xpresion']):] )
+            try:
+                xpr = Xpresion( xpr[len(settings['Xpresion']):] )
+            except RuntimeError:
+                xpr = None
             return xpr
     return xpr
 
 def evaluate(xpr, data):
-    return xpr.evaluate(data) if isinstance(xpr, Xpresion) else xpr
+    return xpr.evaluate(data) if isinstance(xpr, Xpresion) else str(xpr)
     
 
 def parse_options( defaults, required=None ):
@@ -684,12 +687,10 @@ BeeldParsers = {
 # aliases
 BeeldParsers['.yaml'] = BeeldParsers['.yml']
 BeeldParsers['*'] = BeeldParsers['.custom']
-Xpresion.defaultConfiguration()
-Xpresion.defFunc({
-    'file': Xpresion.Func('file', 'Fn.file($0)'),
-    'tpl':  Xpresion.Func('tpl',  'Fn.tpl($0)')
-})
-Xpresion.defRuntimeFunc({
+Xpresion.defaultConfiguration().defFunc({
+    'file': {'input':'file', 'output':'Fn.file(<$.0>)', 'otype':Xpresion.T_STR},
+    'tpl':  {'input':'tpl', 'output':'Fn.tpl(<$.0>)', 'otype':Xpresion.T_STR}
+}).defRuntimeFunc({
     'file': read_file,
     'tpl': get_tpl
 })
