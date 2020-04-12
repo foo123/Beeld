@@ -10,7 +10,7 @@ def beeld_plugin_minify( beelder ):
     if BEELD_COMPILERS is None:
         BEELD_COMPILERS = os.path.join(Beeld.ROOT, 'compilers') + '/'
     beelder.addAction('minify', beeld_plugin_action_minify)
-    
+
 def beeld_plugin_action_minify( evt ):
     global Beeld
     global BEELD_COMPILERS
@@ -38,39 +38,39 @@ def beeld_plugin_action_minify( evt ):
     current = params.current
     minify = current.action_cfg
     if minify and '' != data.src:
-        
+
         # fix compiler selection
         selected = params.cmd_opts.compiler.lower() if hasattr(params.cmd_opts,'compiler') and isinstance(params.cmd_opts.compiler, str) else None
         if selected and (selected not in compilers): selected = 'uglifyjs'
-        
+
         if 'uglifyjs' in minify:
             opts = minify['uglifyjs']
             # convert to list/array if not so
             if not isinstance(opts, list): opts = [opts]
             compilers['uglifyjs'].option(" ".join(opts))
             if not selected: selected = 'uglifyjs'
-            
+
         if 'closure' in minify:
             opts = minify['closure']
             # convert to list/array if not so
             if not isinstance(opts, list): opts = [opts]
             compilers['closure'].option(" ".join(opts))
             if not selected: selected = 'closure'
-            
+
         if 'yui' in minify:
             opts = minify['yui']
             # convert to list/array if not so
             if not isinstance(opts, list): opts = [opts]
             compilers['yui'].option(" ".join(opts))
             if not selected: selected = 'yui'
-        
+
         if 'cssmin' in minify:
             opts = minify['cssmin']
             # convert to list/array if not so
             if not isinstance(opts, list): opts = [opts]
             compilers['cssmin'].option(" ".join(opts))
             if not selected: selected = 'cssmin'
-        
+
         Beeld.Utils.write(data.tmp_in, data.src, options.encoding)
 
         extra = ''
@@ -80,7 +80,7 @@ def beeld_plugin_action_minify( evt ):
             extra = "--basepath "+options.basePath
         elif selected in ['yui', 'closure']:
             extra = "--charset "+options.encoding
-                
+
         cmd = compiler.compiler([
          ['${COMPILERS}',    BEELD_COMPILERS]
         ,['${EXTRA}',        extra]
@@ -95,14 +95,14 @@ def beeld_plugin_action_minify( evt ):
         # http://docs.python.org/2/library/os.html#os.wait
         # high-byte is the exit status
         if not (type(err) is int): err = 255 & (err[1]>>8)
-        
+
         if 0==err: data.src = Beeld.Utils.read(data.tmp_out, options.encoding)
-        
+
         # some error occured
-        if 0!=err: 
+        if 0!=err:
             data.err = 'Error executing "'+cmd+'"'
             evt.abort()
             return
-        
+
     evt.next()
 

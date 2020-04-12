@@ -1,7 +1,7 @@
 "use strict";
 
 module.exports = {
-    
+
     beeld_plugin_minify: function( beelder ) {
         var Beeld = beelder.getClass(),
             HAS = Object.prototype.hasOwnProperty,
@@ -25,25 +25,25 @@ module.exports = {
                     'Java Closure Compiler',
                     'java -jar ${COMPILERS}closure.jar ${EXTRA} ${OPTIONS} --js ${IN} --js_output_file ${OUT}'
                 ),
-                'yui': Beeld.Compiler( 
+                'yui': Beeld.Compiler(
                     'Java YUI Compressor Compiler',
                     'java -jar ${COMPILERS}yuicompressor.jar ${EXTRA} ${OPTIONS} --type js -o ${OUT}  ${IN}'
                 )
                 },
                 selected,
-                params = evt.data, 
-                options = params.options, 
-                data = params.data, 
+                params = evt.data,
+                options = params.options,
+                data = params.data,
                 current = params.current,
                 minify = current.action_cfg
             ;
-            
+
             if ( minify && !!data.src )
             {
                 // fix compiler selection
                 selected = HAS.call(params.cmd_opts,'compiler') && params.cmd_opts.compiler ? params.cmd_opts.compiler.toLowerCase() : null;
                 if ( selected && !HAS.call(compilers,selected) ) selected = 'uglifyjs';
-                
+
                 if ( HAS.call(minify,'uglifyjs') )
                 {
                     // make it array
@@ -68,7 +68,7 @@ module.exports = {
                     compilers.cssmin.option([].concat( minify['cssmin'] ).join(" "));
                     if ( !selected ) selected = 'cssmin';
                 }
-                
+
                 var cmd, extra = '', selectedCompiler = compilers[selected];
                 // use the selected compiler
                 if ('cssmin'===selected && 0 > selectedCompiler.options.indexOf("--basepath "))
@@ -79,7 +79,7 @@ module.exports = {
                 {
                     extra = "--charset "+options.encoding;
                 }
-                    
+
                 cmd = selectedCompiler.compiler([
                  ['${COMPILERS}',    BEELD_COMPILERS]
                 ,['${EXTRA}',        extra]
@@ -132,7 +132,7 @@ module.exports = {
                 evt.next( );
             }
         };
-        
+
         beelder.addAction('minify', action_minify);
     }
 };

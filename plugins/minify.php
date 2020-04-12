@@ -36,9 +36,9 @@ function beeld_plugin_action_minify( $evt )
         // fix compiler selection
         $selected = isset($params->cmd_opts['compiler']) ? strtolower(strval($params->cmd_opts['compiler'])) : null;
         if ( $selected && !isset($compilers[ $selected ]) ) $selected = 'uglifyjs';
-        
+
         $minify = (array)$minify;
-        
+
         if (isset($minify['uglifyjs']))
         {
             $compilers['uglifyjs']->option(implode(" ", (array)$minify['uglifyjs']));
@@ -59,9 +59,9 @@ function beeld_plugin_action_minify( $evt )
             $compilers['cssmin']->option(implode(" ", (array)$minify['cssmin']));
             if ( !$selected ) $selected = 'cssmin';
         }
-        
+
         BeeldUtils::write($data->tmp_in, $data->src);
-        
+
         $extra = '';
         // use the selected compiler
         $compiler = $compilers[$selected];
@@ -73,7 +73,7 @@ function beeld_plugin_action_minify( $evt )
         {
             $extra = "--charset ".$options->encoding;
         }
-        
+
         $cmd = $compiler->compiler(array(
          array('${COMPILERS}',       BEELD_COMPILERS)
         ,array('${EXTRA}',           $extra)
@@ -81,13 +81,13 @@ function beeld_plugin_action_minify( $evt )
         ,array('${IN}',              $data->tmp_in)
         ,array('${OUT}',             $data->tmp_out)
         ));
-        
+
         //$cmd = escapeshellcmd( $cmd );
         $out = array(); $err = 0;
         exec($cmd . ' 2>&1', $out, $err);
-        
+
         // some error occured
-        if ( $err ) 
+        if ( $err )
         {
             $data->err = 'Error executing "'.$cmd.'"';
             BeeldUtils::echo_stderr(implode(PHP_EOL, (array)$out));

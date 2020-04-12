@@ -3,7 +3,7 @@ Beeld
 
 **A scriptable, extendable and configurable source code builder framework and tool in Node.js / Python / PHP**
 
-**version 1.0.0**
+**version 1.0.1**
 
 ![beeld is a bee that builds flowers](/beeld.jpg)
 
@@ -58,7 +58,7 @@ __For Node.js__
 * Modified standalone version of `yaml.js` (Symfony Yaml parser) by (c) Fabien Potencier, Jeremy Faivre (included)
 
 __Common Dependencies__
-* `UglifyJS2` package (**required**, global install preferably)
+* `UglifyJS` package (**required**, global install)
 * `Closure` compiler (**included**)
 * `YUI Compressor` compiler (**included**)
 * `Java 6` (**required** by `YUI`, `Closure` compilers)
@@ -70,7 +70,4 @@ __Common Dependencies__
 * `Xpresion` (`node`) (**included**)
 
 **NOTE:** Only one of the three `javascript` minify compilers needs be used, but `Beeld` interfaces are provided for all three.
-
-*URL* [Nikos Web Development](http://nikos-web-development.netai.net/ "Nikos Web Development")  
-<!--*URL* [WorkingClassCode](http://workingclasscode.uphero.com/ "Working Class Code")-->
 

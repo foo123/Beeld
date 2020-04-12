@@ -22,7 +22,7 @@ function beeld_plugin_action_doc( $evt )
         $_trimlen = 0;
         $docs = array();
         $sep = isset($doc['separator']) ? $doc['separator'] : "\n\n";
-            
+
         if (isset($doc['trim']))
         {
             $_trim = BeeldUtils::regex($doc['trim'], $evt);
@@ -37,7 +37,7 @@ function beeld_plugin_action_doc( $evt )
                 $isRegex = 1;
             }
         }
-        
+
         // extract doc blocks
         $blocks = explode( $startDoc, $data->src );
         foreach ($blocks as $b=>$block)
@@ -49,7 +49,7 @@ function beeld_plugin_action_doc( $evt )
             }
         }
         $blocks = null;
-        
+
         // trim start of each doc block line
         if ($_trim)
         {

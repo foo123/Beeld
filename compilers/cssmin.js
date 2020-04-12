@@ -82,7 +82,7 @@ var // utils
     trim = function(s) { return s.replace(trim_re, ''); },
     
     trimd = function(s, delim) { 
-        var r1, r2;
+        var r1, r2, r;
         if (delim)
         {
             r = new RegExp('^['+esc(delim+'')+']+'+'|'+'['+esc(delim+'')+']+$', 'gm');
