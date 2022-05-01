@@ -1,12 +1,12 @@
 import re
 
 Beeld = None
-def beeld_plugin_doc( beelder ):
+def beeld_plugin_doc(beelder):
     global Beeld
     Beeld = beelder.getClass() #BeeldClass
     beelder.addAction('doc', beeld_plugin_action_doc)
 
-def beeld_plugin_action_doc( evt ):
+def beeld_plugin_action_doc(evt):
     global Beeld
     params = evt.data
     options = params.options
@@ -39,16 +39,16 @@ def beeld_plugin_action_doc( evt ):
         docs = []
 
         # extract doc blocks
-        blocks = data.src.split( startDoc )
+        blocks = data.src.split(startDoc)
         for b in blocks:
-            tmp = b.split( endDoc )
-            if len(tmp)>1: docs.append( tmp[0] )
+            tmp = b.split(endDoc)
+            if len(tmp)>1: docs.append(tmp[0])
         blocks = None
 
         # trim start of each doc block line
         if _trim:
             for i in range(len(docs)-1):
-                tmp = docs[i].split( "\n" )
+                tmp = docs[i].split("\n")
 
                 for j in range(len(tmp)-1):
                     if len(tmp[j])>0:
@@ -57,8 +57,8 @@ def beeld_plugin_action_doc( evt ):
                         elif tmp[j].startswith(_trim):
                             tmp[j] = tmp[j][_trimlen:]
 
-                docs[i] = "\n".join( tmp )
-        Beeld.Utils.write(docFile, sep.join( docs ), options.encoding)
+                docs[i] = "\n".join(tmp)
+        Beeld.Utils.write(docFile, sep.join(docs), options.encoding)
 
     evt.next()
 

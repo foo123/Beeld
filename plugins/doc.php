@@ -1,17 +1,16 @@
 <?php
-function beeld_plugin_doc( $beelder )
+function beeld_plugin_doc($beelder)
 {
     $beelder->addAction('doc', 'beeld_plugin_action_doc');
 }
-
-function beeld_plugin_action_doc( $evt )
+function beeld_plugin_action_doc($evt)
 {
     $params =& $evt->data;
     $options =& $params->options;
     $data =& $params->data;
     $current =& $params->current;
     $doc = $current->action_cfg;
-    if ( $doc && isset($doc['output']) )
+    if ($doc && isset($doc['output']))
     {
         $doc['output'] = BeeldUtils::xpresion($doc['output'], $evt); // parse xpresion if any
         $docFile = BeeldUtils::get_real_path(BeeldUtils::evaluate($doc['output'], array()), $options->basePath);
@@ -26,7 +25,7 @@ function beeld_plugin_action_doc( $evt )
         if (isset($doc['trim']))
         {
             $_trim = BeeldUtils::regex($doc['trim'], $evt);
-            if ( false === $_trim )
+            if (false === $_trim)
             {
                 $_trim = $doc['trim'];
                 $_trimlen = strlen($_trim);
@@ -39,11 +38,11 @@ function beeld_plugin_action_doc( $evt )
         }
 
         // extract doc blocks
-        $blocks = explode( $startDoc, $data->src );
-        foreach ($blocks as $b=>$block)
+        $blocks = explode($startDoc, $data->src);
+        foreach ($blocks as $b => $block)
         {
-            $tmp = explode( $endDoc, $block );
-            if ( isset($tmp[1]) )
+            $tmp = explode($endDoc, $block);
+            if (isset($tmp[1]))
             {
                 $docs[] = $tmp[0];
             }
@@ -53,10 +52,10 @@ function beeld_plugin_action_doc( $evt )
         // trim start of each doc block line
         if ($_trim)
         {
-            foreach ($docs as $i=>$d)
+            foreach ($docs as $i => $d)
             {
-                $tmp = explode( "\n", $d );
-                foreach ($tmp as $j=>$t)
+                $tmp = explode("\n", $d);
+                foreach ($tmp as $j => $t)
                 {
                     if (strlen($t))
                     {
@@ -70,10 +69,10 @@ function beeld_plugin_action_doc( $evt )
                         }
                     }
                 }
-                $docs[$i] = implode( "\n", $tmp );
+                $docs[$i] = implode("\n", $tmp);
             }
         }
-        BeeldUtils::write($docFile, implode( $sep, $docs ));
+        BeeldUtils::write($docFile, implode($sep, $docs));
     }
     $evt->next();
 }

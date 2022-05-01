@@ -1,17 +1,16 @@
 /**
 *#!/usr/bin/env node
-* 
+*
 * CSSmin.py for Notepad++ Python Scripting plugin
 * https://github.com/ethanpil/npp-cssmin
 * This is a simple script that contains a Python port of the YUI CSS Compressor so you can minify both CSS and JS
-* 
+*
 * Credits:
-*   Original cssmin.py ported from YUI here https://github.com/zacharyvoase/cssmin 
-* 
+*   Original cssmin.py ported from YUI here https://github.com/zacharyvoase/cssmin
+*
 * Modified version of npp-cssmin adapted for Node 0.8+
-* v. 1.0.0
-* @Nikos M.
-* 
+* v. 1.0.1
+*
 **/
 !function (root, moduleName, moduleDefinition) {
 //
@@ -28,26 +27,26 @@ else root[ moduleName ] = moduleDefinition();
 }(this, 'CSSMin', function( undef ) {
 "use strict";
 // the exported object
-var CSSMin = { VERSION : "1.0.0" };
+var CSSMin = { VERSION : "1.0.1" };
 
 var // node modules
     isNode = ('undefined' !== typeof global) && ('[object global]' == {}.toString.call(global)) && ('function' === typeof require),
-    fs, path, realpath, readFile, writeFile, exists, unLink, 
-    dirname, pjoin, exit, 
+    fs, path, realpath, readFile, writeFile, exists, unLink,
+    dirname, pjoin, exit,
     echo = console.log, echoStdErr = console.error,
     THISFILE = 'CSSMin', DS = '/', DSRX = /\/|\\/g, FILENAME = /^[a-z0-9_]/i
 ;
 
 if ( isNode )
 {
-    fs = require('fs'); 
+    fs = require('fs');
     path = require('path');
-    realpath = fs.realpathSync; 
+    realpath = fs.realpathSync;
     readFile = function(file, enc) { return fs.readFileSync(file, {encoding: enc||'utf8'}); };
     writeFile = function(file, text, enc) { return fs.writeFileSync(file, text, {encoding: enc||'utf8'}); };
-    exists = fs.existsSync; 
+    exists = fs.existsSync;
     unLink = fs.unlinkSync;
-    dirname = path.dirname; 
+    dirname = path.dirname;
     pjoin = path.join;
     THISFILE = path.basename(__filename);
     exit = process.exit;
@@ -56,32 +55,32 @@ if ( isNode )
 
 var // utils
     round = Math.round, floor = Math.floor, min = Math.min, max = Math.max, abs = Math.abs,
-    
+
     clamp = function(v, m, M) { return max(min(v, M), m); },
-    
-    AP = Array.prototype, OP = Object.prototype, 
+
+    AP = Array.prototype, OP = Object.prototype,
     HAS = OP.hasOwnProperty, concat = AP.concat, slice = AP.slice,
-    
-    extend = function(o1, o2) { 
-        o1 = o1 || {}; 
+
+    extend = function(o1, o2) {
+        o1 = o1 || {};
         for (var p in o2)
-        { 
-            if ( HAS.call(o2,p) ) 
-            { 
-                o1[p] = o2[p]; 
-            } 
-        }; 
-        return o1; 
+        {
+            if ( HAS.call(o2,p) )
+            {
+                o1[p] = o2[p];
+            }
+        };
+        return o1;
     },
-    
+
     esc = function(s) { return s.replace(/([.*+?^${}()|\[\]\/\\\-])/g, '\\$1'); },
-    
+
     startsWith = function(s, p) { return (s && p == s.substr(0, p.length)); },
-    
+
     trim_re = /^\s+|\s+$/gm,
     trim = function(s) { return s.replace(trim_re, ''); },
-    
-    trimd = function(s, delim) { 
+
+    trimd = function(s, delim) {
         var r1, r2, r;
         if (delim)
         {
@@ -93,7 +92,7 @@ var // utils
         }
         return s.replace(r, '');
     },
-    
+
     str_replace = function(r1, r2, s) {
         if ( 3 <= arguments.length )
         {
@@ -110,22 +109,22 @@ var // utils
         }
         return r1;
     },
-    
+
     // https://github.com/JosephMoniz/php-path
     joinPath = function() {
         var i, args = slice.call(arguments), argslen = args.length,
-            path, plen, isAbsolute, trailingSlash, 
+            path, plen, isAbsolute, trailingSlash,
             peices, peiceslen, tmp,
             new_path, up, last
         ;
-        
+
         if (!argslen)  return ".";
-        
+
         path = args.join( DS );
         plen = path.length;
-        
+
         if (!plen) return ".";
-        
+
         isAbsolute    = path[0];
         trailingSlash = path[plen - 1];
 
@@ -136,17 +135,17 @@ var // utils
         {
             if (tmp[i].length) peices.push(tmp[i]);
         }
-        
+
         new_path = [];
         up = 0;
         i = peices.length-1;
         while (i>=0)
         {
             last = peices[i];
-            if (last == "..") 
+            if (last == "..")
             {
                 up++;
-            } 
+            }
             else if (last != ".")
             {
                 if (up)  up--;
@@ -154,40 +153,40 @@ var // utils
             }
             i--;
         }
-        
+
         path = new_path.reverse().join( DS );
-        
-        if (!path.length && !isAbsolute.length) 
+
+        if (!path.length && !isAbsolute.length)
         {
             path = ".";
         }
 
-        if (path.length && trailingSlash == DS /*"/"*/) 
+        if (path.length && trailingSlash == DS /*"/"*/)
         {
             path += DS /*"/"*/;
         }
 
         return (isAbsolute == DS /*"/"*/ ? DS /*"/"*/ : "") + path;
     },
-    
+
     isRelativePath = function(file) {
-        
+
         if (
-            startsWith(file, 'http://') || 
+            startsWith(file, 'http://') ||
             startsWith(file, 'https://') ||
             startsWith(file, '/') ||
             startsWith(file, '\\')
         )
             return false;
         else if (
-            startsWith(file, './') || 
-            startsWith(file, '../') || 
-            startsWith(file, '.\\') || 
+            startsWith(file, './') ||
+            startsWith(file, '../') ||
+            startsWith(file, '.\\') ||
             startsWith(file, '..\\') ||
             FILENAME.test(file)
         )
             return true;
-            
+
         // unknown
         return false;
     }
@@ -197,33 +196,35 @@ var // utils
 // CSSMin configurations
 var WEBKIT = 1, MOZ = 2, MS = 4, O = 8;
 CSSMin.Config = {
-    
+
     //
     // Regexes for parsing
     Regex : {
-        
+
         escape : esc,
-        
-        compute_vendor_values : function( ) { 
-            return new RegExp('(^|\\s|:|,)(\\s*)(' + Object.keys(CSSMin.Config.Vendor['values']).map(esc).join('|') + ')($|;|\\s|,)', 'gmi'); 
+
+        compute_vendor_values : function( ) {
+            return new RegExp('(^|\\s|:|,)(\\s*)(' + Object.keys(CSSMin.Config.Vendor['values']).map(esc).join('|') + ')($|;|\\s|,)', 'gmi');
         },
-        compute_vendor_explicits : function( ) { 
-            return new RegExp('(^|;|\\{)(\\s*)((' + Object.keys(CSSMin.Config.Vendor['explicit']).map(esc).join('|') + ')\\s*:([^;\\}]*))($|;|\\})', 'gmi'); 
+        compute_vendor_explicits : function( ) {
+            return new RegExp('(^|;|\\{)(\\s*)((' + Object.keys(CSSMin.Config.Vendor['explicit']).map(esc).join('|') + ')\\s*:([^;\\}]*))($|;|\\})', 'gmi');
         },
-        compute_vendor_properties : function( ) { 
-            return new RegExp('(^|;|\\{)(\\s*)((' + Object.keys(CSSMin.Config.Vendor['properties']).map(esc).join('|') + ')\\s*:([^;\\}]*))($|;|\\})', 'gmi'); 
+        compute_vendor_properties : function( ) {
+            return new RegExp('(^|;|\\{)(\\s*)((' + Object.keys(CSSMin.Config.Vendor['properties']).map(esc).join('|') + ')\\s*:([^;\\}]*))($|;|\\})', 'gmi');
         },
-        compute_vendor_atrules : function( ) { 
-            return new RegExp('(^|;|\\{|\\})(\\s*)(@(' + Object.keys(CSSMin.Config.Vendor['atrules']).map(esc).join('|') + ')\\s+([0-9a-zA-Z_\\-]+)\\s*\\{)', 'gmi'); 
+        compute_vendor_atrules : function( ) {
+            return new RegExp('(^|;|\\{|\\})(\\s*)(@(' + Object.keys(CSSMin.Config.Vendor['atrules']).map(esc).join('|') + ')\\s+([0-9a-zA-Z_\\-]+)\\s*\\{)', 'gmi');
         },
 
         'leadingSpaceOrCommas': /^[\s,]+/,
         'hsla': /\b(hsla?)\b\s*\(([^\(\)]+)\)/gmi,
         'rgba': /\b(rgba?)\b\s*\(([^\(\)]+)\)/gmi,
         'pseudoclasscolon': /(^|\})(([^\{\:])+\:)+([^\{]*\{)/gm,
-        'whitespace_start': /\s+([!{};:>+\(\)\],])/gm,
+        //'whitespace_start': /\s+([!{};:>+\(\)\],])/gm,
+        'whitespace_start': /\s+([!{};:>\)\],])/gm,
         'and': /\band\(/gmi,
-        'whitespace_end': /([!{}:;>+\(\[,])\s+/gm,
+        //'whitespace_end': /([!{}:;>+\(\[,])\s+/gm,
+        'whitespace_end': /([!{}:;>\(\[,])\s+/gm,
         'space': /\s+/gm,
         'semi': /;+\}/gm,
         'semicolons': /;;+/gm,
@@ -235,26 +236,26 @@ CSSMin.Config = {
         'url': /\burl\b\s*\(([^\)]+?)\)/gmi,
         'charset': /@charset [^;]+($|;)/gmi
     },
-    
+
     //
     // Vendor prefixes and polyfills configurations
     Vendor: {
-        
+
         'WEBKIT' : WEBKIT, 'MOZ' : MOZ, 'MS' : MS, 'O' : O,
-        
+
         // vendor prefixes config
         'prefixes' : [ [WEBKIT, '-webkit-'], [MOZ, '-moz-'], [MS, '-ms-'],  [O, '-o-'] ],
-        
+
         'Regex' : {
             'polyfills': {
                 'gradient': /(^|\s+|;)(background-image|background)\b\s*:\s*(linear-gradient)\b([^;\}]*)(;|\})/gmi
             },
-            'values': null, 
-            'explicit': null, 
-            'properties': null, 
-            'atrules': null 
+            'values': null,
+            'explicit': null,
+            'properties': null,
+            'atrules': null
         },
-        
+
         'polyfills' : {
             'linear-gradient' : [
                 [
@@ -284,7 +285,7 @@ CSSMin.Config = {
                     '__PROP__:linear-gradient(__DIR__  __COLORSTOPS__);'
                 ]
             ]/*,
-            
+
             'radial-gradient' : [
                 [
                     /* Old browsers * /
@@ -314,7 +315,7 @@ CSSMin.Config = {
                 ]
             ]*/
         },
-        
+
         'explicit': {
             'border-top-left-radius' : ['-webkit-border-top-left-radius', '-moz-border-radius-topleft']
             ,'border-bottom-left-radius' : ['-webkit-border-bottom-left-radius', '-moz-border-radius-bottomleft']
@@ -323,7 +324,7 @@ CSSMin.Config = {
             ,'align-items' : ['-webkit-box-align', '-moz-box-align', '-ms-flex-align', '-webkit-align-items']
             ,'justify-content' : ['-webkit-box-pack', '-moz-box-pack', '-ms-flex-pack', '-webkit-justify-content']
         },
-        
+
         'values': {
             'border-radius' : WEBKIT | MOZ | MS | O
             ,'box-shadow' : WEBKIT | MOZ | MS | O
@@ -332,7 +333,7 @@ CSSMin.Config = {
             ,'transform-origin' : WEBKIT | MOZ | MS | O
             ,'transform-style' : WEBKIT | MOZ | MS | O
         },
-        
+
         'properties': {
             'animation' : WEBKIT | MOZ | MS | O
             ,'animation-delay' : WEBKIT | MOZ | MS | O
@@ -385,10 +386,10 @@ CSSMin.Config.Vendor.Regex['atrules'] = CSSMin.Config.Regex.compute_vendor_atrul
 //
 // CSS String utils
 CSSMin.String = {
-    
+
     trim :  trim,
     trimd : trimd,
-    
+
     // adapted from phpjs (https://github.com/kvz/phpjs)
     sprintf : function sprintf() {
         var regex = /%%|%(\d+\$)?([-+\'#0 ]*)(\*\d+\$|\*|\d+)?(\.(\*\d+\$|\*|\d+))?([scboxXuideEfFgG])/g;
@@ -556,7 +557,7 @@ CSSMin.String = {
         };
         return format.replace(regex, doFormat);
     },
-    
+
     vsprintf : function vsprintf(format, args) { return this.sprintf.apply(this, [format].concat(args));  }
 };
 
@@ -570,91 +571,91 @@ var Base64 = CSSMin.String.Base64 = {
 
     // private property
     _keyStr : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
- 
+
     encode2 : function(input) {
         return new Buffer(input, 'binary').toString('base64');
     },
-    
+
     // public method for encoding
     encode : function base64_encode(input) {
         var output = "";
         var chr1, chr2, chr3, enc1, enc2, enc3, enc4;
         var i = 0;
- 
+
         input = Base64._utf8_encode(input);
- 
+
         while (i < input.length) {
- 
+
             chr1 = input.charCodeAt(i++);
             chr2 = input.charCodeAt(i++);
             chr3 = input.charCodeAt(i++);
- 
+
             enc1 = chr1 >> 2;
             enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
             enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
             enc4 = chr3 & 63;
- 
+
             if (isNaN(chr2)) {
                 enc3 = enc4 = 64;
             } else if (isNaN(chr3)) {
                 enc4 = 64;
             }
- 
+
             output = output +
             this._keyStr.charAt(enc1) + this._keyStr.charAt(enc2) +
             this._keyStr.charAt(enc3) + this._keyStr.charAt(enc4);
- 
+
         }
- 
+
         return output;
     },
- 
+
     // public method for decoding
     decode : function base64_decode(input) {
         var output = "";
         var chr1, chr2, chr3;
         var enc1, enc2, enc3, enc4;
         var i = 0;
- 
+
         input = input.replace(/[^A-Za-z0-9\+\/\=]/g, "");
- 
+
         while (i < input.length) {
- 
+
             enc1 = this._keyStr.indexOf(input.charAt(i++));
             enc2 = this._keyStr.indexOf(input.charAt(i++));
             enc3 = this._keyStr.indexOf(input.charAt(i++));
             enc4 = this._keyStr.indexOf(input.charAt(i++));
- 
+
             chr1 = (enc1 << 2) | (enc2 >> 4);
             chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
             chr3 = ((enc3 & 3) << 6) | enc4;
- 
+
             output = output + String.fromCharCode(chr1);
- 
+
             if (enc3 != 64) {
                 output = output + String.fromCharCode(chr2);
             }
             if (enc4 != 64) {
                 output = output + String.fromCharCode(chr3);
             }
- 
+
         }
- 
+
         output = Base64._utf8_decode(output);
- 
+
         return output;
- 
+
     },
- 
+
     // private method for UTF-8 encoding
     _utf8_encode : function (string) {
         string = string.replace(/\r\n/g,"\n");
         var utftext = "";
- 
+
         for (var n = 0; n < string.length; n++) {
- 
+
             var c = string.charCodeAt(n);
- 
+
             if (c < 128) {
                 utftext += String.fromCharCode(c);
             }
@@ -667,22 +668,22 @@ var Base64 = CSSMin.String.Base64 = {
                 utftext += String.fromCharCode(((c >> 6) & 63) | 128);
                 utftext += String.fromCharCode((c & 63) | 128);
             }
- 
+
         }
- 
+
         return utftext;
     },
- 
+
     // private method for UTF-8 decoding
     _utf8_decode : function (utftext) {
         var string = "";
         var i = 0;
         var c = c1 = c2 = 0;
- 
+
         while ( i < utftext.length ) {
- 
+
             c = utftext.charCodeAt(i);
- 
+
             if (c < 128) {
                 string += String.fromCharCode(c);
                 i++;
@@ -698,9 +699,9 @@ var Base64 = CSSMin.String.Base64 = {
                 string += String.fromCharCode(((c & 15) << 12) | ((c2 & 63) << 6) | (c3 & 63));
                 i += 3;
             }
- 
+
         }
- 
+
         return string;
     }
 };
@@ -867,8 +868,8 @@ Color.Keywords = {
     ,'white'               : [  255,255,255  ,1]
     ,'whitesmoke'          : [  245,245,245  ,1]
     ,'yellow'              : [  255,255,0    ,1]
-    ,'yellowgreen'         : [  154,205,50   ,1]    
-};          
+    ,'yellowgreen'         : [  154,205,50   ,1]
+};
 Color.clamp = clamp;
 var C2P = Color.C2P = 100/255;
 var P2C = Color.P2C = 2.55;
@@ -886,7 +887,7 @@ var col2per = Color.col2per = function(c, suffix) {
 var per2col = Color.per2col = function(c) {
     return c*P2C;
 };
-var rgb2hex = Color.rgb2hex = function(r, g, b, condenced, asPercent) { 
+var rgb2hex = Color.rgb2hex = function(r, g, b, condenced, asPercent) {
     var hex;
     if ( asPercent )
     {
@@ -894,19 +895,19 @@ var rgb2hex = Color.rgb2hex = function(r, g, b, condenced, asPercent) {
         g = clamp(round(g*P2C), 0, 255);
         b = clamp(round(b*P2C), 0, 255);
     }
-    
+
     r = ( r < 16 ) ? '0'+r.toString(16) : r.toString(16);
     g = ( g < 16 ) ? '0'+g.toString(16) : g.toString(16);
     b = ( b < 16 ) ? '0'+b.toString(16) : b.toString(16);
-    
+
     if ( condenced && (r[0]==r[1] && g[0]==g[1] && b[0]==b[1]) )
         hex = '#' + r[0] + g[0] + b[0];
     else
         hex = '#' + r + g + b;
-    
+
     return hex;
 };
-var rgb2hexIE = Color.rgb2hexIE = function(r, g, b, a, asPercent) { 
+var rgb2hexIE = Color.rgb2hexIE = function(r, g, b, a, asPercent) {
     var hex;
     if ( asPercent )
     {
@@ -915,37 +916,37 @@ var rgb2hexIE = Color.rgb2hexIE = function(r, g, b, a, asPercent) {
         b = clamp(round(b*P2C), 0, 255);
         a = clamp(round(a*P2C), 0, 255);
     }
-    
+
     r = ( r < 16 ) ? '0'+r.toString(16) : r.toString(16);
     g = ( g < 16 ) ? '0'+g.toString(16) : g.toString(16);
     b = ( b < 16 ) ? '0'+b.toString(16) : b.toString(16);
     a = ( a < 16 ) ? '0'+a.toString(16) : a.toString(16);
     hex = '#' + a + r + g + b;
-    
+
     return hex;
 };
-var hex2rgb = Color.hex2rgb = function(h/*, asPercent*/) {  
+var hex2rgb = Color.hex2rgb = function(h/*, asPercent*/) {
     if ( !h || 3 > h.length )
         return [0, 0, 0];
-        
+
     if ( 6 > h.length )
         return [
-            clamp( parseInt(h[0]+h[0], 16), 0, 255 ), 
-            clamp( parseInt(h[1]+h[1], 16), 0, 255 ), 
+            clamp( parseInt(h[0]+h[0], 16), 0, 255 ),
+            clamp( parseInt(h[1]+h[1], 16), 0, 255 ),
             clamp( parseInt(h[2]+h[2], 16), 0, 255 )
         ];
-    
+
     else
         return [
-            clamp( parseInt(h[0]+h[1], 16), 0, 255 ), 
-            clamp( parseInt(h[2]+h[3], 16), 0, 255 ), 
+            clamp( parseInt(h[0]+h[1], 16), 0, 255 ),
+            clamp( parseInt(h[2]+h[3], 16), 0, 255 ),
             clamp( parseInt(h[4]+h[5], 16), 0, 255 )
         ];
-    
+
     /*if ( asPercent )
         rgb = [
-            (rgb[0]*C2P)+'%', 
-            (rgb[1]*C2P)+'%', 
+            (rgb[0]*C2P)+'%',
+            (rgb[1]*C2P)+'%',
             (rgb[2]*C2P)+'%'
         ];*/
 };
@@ -971,7 +972,7 @@ var hsl2rgb = Color.hsl2rgb = function(h, s, l) {
     h = ((h + 360)%360)/360;
     s *= 0.01;
     l *= 0.01;
-    
+
     if ( 0 == s )
     {
         // achromatic
@@ -990,8 +991,8 @@ var hsl2rgb = Color.hsl2rgb = function(h, s, l) {
     }
 
     return [
-        clamp( round(r * 255), 0, 255 ), 
-        clamp( round(g * 255), 0, 255 ),  
+        clamp( round(r * 255), 0, 255 ),
+        clamp( round(g * 255), 0, 255 ),
         clamp( round(b * 255), 0, 255 )
     ];
 };
@@ -1003,7 +1004,7 @@ var hsl2rgb = Color.hsl2rgb = function(h, s, l) {
 */
 var rgb2hsl = Color.rgb2hsl = function(r, g, b, asPercent) {
     var fact = 1/255, m, M, h, s, l, d;
-    
+
     if ( asPercent )
     {
         r *= 0.01;
@@ -1012,11 +1013,11 @@ var rgb2hsl = Color.rgb2hsl = function(r, g, b, asPercent) {
     }
     else
     {
-        r *= fact; 
-        g *= fact; 
+        r *= fact;
+        g *= fact;
         b *= fact;
     }
-    M = max(r, g, b); 
+    M = max(r, g, b);
     m = min(r, g, b);
     l = 0.5*(M + m);
 
@@ -1028,30 +1029,30 @@ var rgb2hsl = Color.rgb2hsl = function(r, g, b, asPercent) {
     {
         d = M - m;
         s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        
+
         if ( M == r )
             h = (g - b) / d + (g < b ? 6 : 0);
-        
+
         else if ( M == g )
             h = (b - r) / d + 2;
-        
+
         else
             h = (r - g) / d + 4;
-        
+
         h /= 6;
     }
-    
+
     return [
-        round( h*360 ) % 360, 
-        clamp(s*100, 0, 100), 
+        round( h*360 ) % 360,
+        clamp(s*100, 0, 100),
         clamp(l*100, 0, 100)
     ];
 };
 Color.parse = function(s, withColorStops, parsed, onlyColor) {
     var m, m2, s2, end = 0, end2 = 0, c, hasOpacity;
-    
-    if ( 'hsl' == parsed || 
-        ( !parsed && (m = s.match(Color.hslRE)) ) 
+
+    if ( 'hsl' == parsed ||
+        ( !parsed && (m = s.match(Color.hslRE)) )
     )
     {
         // hsl(a)
@@ -1066,18 +1067,18 @@ Color.parse = function(s, withColorStops, parsed, onlyColor) {
             end2 = 0;
             hasOpacity = 'hsla' == m[1].toLowerCase();
             var col = m[2].split(',').map(trim);
-        }    
-        
+        }
+
         var h = col[0] ? col[0] : '0';
         var s = col[1] ? col[1] : '0';
         var l = col[2] ? col[2] : '0';
         var a = hasOpacity && null!=col[3] ? col[3] : '1';
-        
+
         h = parseFloat(h, 10);
         s = ('%'==s.slice(-1)) ? parseFloat(s, 10) : parseFloat(s, 10)*C2P;
         l = ('%'==l.slice(-1)) ? parseFloat(l, 10) : parseFloat(l, 10)*C2P;
         a = parseFloat(a, 10);
-        
+
         c = new Color().fromHSL([h, s, l, a]);
 
         if ( withColorStops )
@@ -1091,8 +1092,8 @@ Color.parse = function(s, withColorStops, parsed, onlyColor) {
         }
         return onlyColor ? c : [c, 0, end+end2];
     }
-    if ( 'rgb' == parsed || 
-        ( !parsed && (m = s.match(Color.rgbRE)) ) 
+    if ( 'rgb' == parsed ||
+        ( !parsed && (m = s.match(Color.rgbRE)) )
     )
     {
         // rgb(a)
@@ -1107,18 +1108,18 @@ Color.parse = function(s, withColorStops, parsed, onlyColor) {
             end2 = 0;
             hasOpacity = 'rgba' == m[1].toLowerCase();
             var col = m[2].split(',').map(trim);
-        }    
-            
+        }
+
         var r = col[0] ? col[0] : '0';
         var g = col[1] ? col[1] : '0';
         var b = col[2] ? col[2] : '0';
         var a = hasOpacity && null!=col[3] ? col[3] : '1';
-        
+
         r = ('%'==r.slice(-1)) ? parseFloat(r, 10)*2.55 : parseFloat(r, 10);
         g = ('%'==g.slice(-1)) ? parseFloat(g, 10)*2.55 : parseFloat(g, 10);
         b = ('%'==b.slice(-1)) ? parseFloat(b, 10)*2.55 : parseFloat(b, 10);
         a = parseFloat(a, 10);
-        
+
         c = new Color().fromRGB([r, g, b, a]);
 
         if ( withColorStops )
@@ -1132,8 +1133,8 @@ Color.parse = function(s, withColorStops, parsed, onlyColor) {
         }
         return onlyColor ? c : [c, 0, end+end2];
     }
-    if ( 'hex' == parsed || 
-        ( !parsed && (m = s.match(Color.hexRE)) ) 
+    if ( 'hex' == parsed ||
+        ( !parsed && (m = s.match(Color.hexRE)) )
     )
     {
         // hex
@@ -1146,13 +1147,13 @@ Color.parse = function(s, withColorStops, parsed, onlyColor) {
             end = m[0].length;
             end2 = 0;
             var col = hex2rgb( m[1] );
-        }    
-            
+        }
+
         var h1 = col[0] ? col[0] : 0x00;
         var h2 = col[1] ? col[1] : 0x00;
         var h3 = col[2] ? col[2] : 0x00;
         var a = null!=col[3] ? col[3] : 0xff;
-        
+
         c = new Color().fromHEX([h1, h2, h3, a]);
 
         if ( withColorStops )
@@ -1166,8 +1167,8 @@ Color.parse = function(s, withColorStops, parsed, onlyColor) {
         }
         return onlyColor ? c : [c, 0, end+end2];
     }
-    if ( 'keyword' == parsed || 
-        ( !parsed && (m = s.match(Color.keywordRE)) ) 
+    if ( 'keyword' == parsed ||
+        ( !parsed && (m = s.match(Color.keywordRE)) )
     )
     {
         // keyword
@@ -1180,8 +1181,8 @@ Color.parse = function(s, withColorStops, parsed, onlyColor) {
             end = m[0].length;
             end2 = 0;
             var col = m[1];
-        }    
-            
+        }
+
         c = new Color().fromKeyword(col);
 
         if ( withColorStops )
@@ -1203,13 +1204,13 @@ Color.get = function(s, withColorStops, parsed) {
 //
 // instance
 Color.prototype = {
-    
+
     constructor: Color,
-    
+
     col: null,
     cstop: null,
     kword: null,
-    
+
     clone: function() {
         var c = new Color();
         c.col = this.col.slice();
@@ -1217,14 +1218,14 @@ Color.prototype = {
         c.kword = this.kword;
         return c;
     },
-    
+
     reset: function() {
         this.col = [0, 0, 0, 1];
         this.cstop = '';
         this.kword = null;
         return this;
     },
-    
+
     set: function(color, cstop) {
         if ( color )
         {
@@ -1238,30 +1239,30 @@ Color.prototype = {
                 this.col[3] = clamp(color[3], 0, 1);
             else
                 this.col[3] = 1;
-                
+
             if (cstop)
                 this.cstop = cstop;
-                
+
             this.kword = null;
         }
         return this;
     },
-    
+
     colorStop: function(cstop) {
         this.cstop = cstop;
         return this;
     },
-    
+
     isTransparent: function() {
         return 1 > this.col[3];
     },
-    
+
     isKeyword: function() {
         return this.kword ? true : false;
     },
-    
+
     fromKeyword: function(kword) {
-        
+
         kword = kword.toLowerCase();
         if ( Color.Keywords[kword] )
         {
@@ -1270,58 +1271,58 @@ Color.prototype = {
         }
         return this;
     },
-    
+
     fromHEX: function(hex) {
-        
+
         this.col[0] = hex[0] ? clamp(parseInt(hex[0], 10), 0, 255) : 0;
         this.col[1] = hex[1] ? clamp(parseInt(hex[1], 10), 0, 255) : 0;
         this.col[2] = hex[2] ? clamp(parseInt(hex[2], 10), 0, 255) : 0;
         this.col[3] = undef!==hex[3] ? clamp(parseInt(hex[3], 10)/255, 0, 1) : 1;
-        
+
         this.kword = null;
-        
+
         return this;
     },
-    
+
     fromRGB: function(rgb) {
-        
+
         this.col[0] = rgb[0] ? clamp(round(rgb[0]), 0, 255) : 0;
         this.col[1] = rgb[1] ? clamp(round(rgb[1]), 0, 255) : 0;
         this.col[2] = rgb[2] ? clamp(round(rgb[2]), 0, 255) : 0;
         this.col[3] = undef!==rgb[3] ? clamp(rgb[3], 0, 1) : 1;
-        
+
         this.kword = null;
-        
+
         return this;
     },
-    
+
     fromHSL: function(hsl) {
         var rgb = hsl2rgb(hsl[0]||0, hsl[1]||0, hsl[2]||0);
-        
+
         this.col[0] = rgb[0];
         this.col[1] = rgb[1];
         this.col[2] = rgb[2];
         this.col[3] = undef!==hsl[3] ? clamp(hsl[3], 0, 1) : 1;
-        
+
         this.kword = null;
-        
+
         return this;
     },
-    
+
     toKeyword: function(asString, withTransparency) {
         if ( this.kword )
             return this.kword;
         else
             return this.toHEX(1, 1, withTransparency);
     },
-    
+
     toHEX: function(asString, condenced, withTransparency) {
         if ( withTransparency )
             return rgb2hexIE( this.col[0], this.col[1], this.col[2], clamp(round(255*this.col[3]), 0, 255) );
         else
             return rgb2hex( this.col[0], this.col[1], this.col[2], condenced );
     },
-    
+
     toRGB: function(asString, noTransparency) {
         if ( asString )
         {
@@ -1338,7 +1339,7 @@ Color.prototype = {
                 return this.col.slice();
         }
     },
-    
+
     toHSL: function(asString, noTransparency) {
         var hsl = rgb2hsl(this.col[0], this.col[1], this.col[2]);
         if ( asString )
@@ -1356,7 +1357,7 @@ Color.prototype = {
                 return hsl.concat( this.col[3] );
         }
     },
-    
+
     toColorStop: function(compatType) {
         var cstop = this.cstop;
         if ( compatType )
@@ -1376,7 +1377,7 @@ Color.prototype = {
                 return this.toHEX(1,1) + cstop;
         }
     },
-    
+
     toString: function( format, condenced ) {
         format = format ? format.toLowerCase() : 'hex';
         if ( 'rgb' == format || 'rgba' == format )
@@ -1411,7 +1412,7 @@ Angle.compatOffset = 0.5*Math.PI;
 Angle.angleRE = /^(-?\d+(\.\d+)?)(deg|rad|grad|turn)\b/i;
 Angle.parse = function(s, onlyAngle) {
     var m, a;
-    
+
     if ( m = s.match(Angle.angleRE) )
     {
         a = new Angle(parseFloat(m[1], 10), m[3]);
@@ -1421,28 +1422,28 @@ Angle.parse = function(s, onlyAngle) {
 };
 Angle.prototype = {
     constructor: Angle,
-    
+
     a: 0,
-    
+
     set: function(a, unit, legacy) {
         unit = unit ? unit.toLowerCase() : null;
-        
+
         if ( 'deg' == unit )
             a *= DEG2RAD;
         else if ( 'grad' == unit )
             a *= GRAD2RAD;
         else if ( 'turn' == unit )
             a *= TURN2RAD;
-        
+
         this.a = a;
-        
+
         return this;
     },
-    
+
     toString: function( unit, legacy ) {
         unit = unit ? unit.toLowerCase() : 'rad';
         var a = this.a;
-        
+
         if ( legacy )
         {
             // w3c 0 angle is NORTH, "left-handed"
@@ -1463,12 +1464,12 @@ Angle.prototype = {
 //
 // CSS Gradient utils
 var Gradient = CSSMin.Gradient = {
-    
+
     dirRE : /^(to\s+((top|bottom)\b)?(\s*)((left|right)\b)?)/i,
-    
+
     parseDirection : function(s) {
         var m;
-        
+
         if ( m = Angle.parse(s) )
         {
             return m;
@@ -1477,21 +1478,21 @@ var Gradient = CSSMin.Gradient = {
         {
             return [[m[1], m[3], m[6]], 0, m[0].length];
         }
-        
+
         return null;
     },
     /*
     parsePositions : function(s) {
-        [ circle               || <length> ]                     [ at <position> ]? , | 
+        [ circle               || <length> ]                     [ at <position> ]? , |
         /(\(\s*)(circle\b|\d+[a-z]{0,3})\s+(center\b|\d+[a-z]{0,3}\s+\d+[a-z]{0,3})/i
         [ ellipse              || [<length> | <percentage> ]{2}] [ at <position> ]? , |
         /(\(\s*)(ellipse\b|\d+[a-z]{0,3}\s+\d+[a-z]{0,3})\s+(center\b|\d+[a-z]{0,3}\s+\d+[a-z]{0,3})/i
         [ [ circle | ellipse ] || <extent-keyword> ]             [ at <position> ]? , |
         /(\(\s*)(circle\b|ellipse\b|closest-corner\b|closest-side\b|farthest-corner\b|farthest-side\b)\s+(center\b|\d+[a-z]{0,3}\s+\d+[a-z]{0,3})/i
                                                                    //at <position>
-                                                                   
+
         /(\(\s*)(center\b|\d+[a-z]{0,3}\s+\d+[a-z]{0,3})/i
-        
+
         var m;
         if ( m = s.match(/(\(\s*)(circle\b|\d+[a-z]{0,3})\s+(center\b|\d+[a-z]{0,3}\s+\d+[a-z]{0,3})/i) )
         {
@@ -1502,17 +1503,17 @@ var Gradient = CSSMin.Gradient = {
     */
     getDirection : function(dir, type) {
         var d1, d2;
-        
+
         if ( !dir ) return dir;
-        
+
         if ( dir instanceof Angle )
             return (type) ? dir.toString('deg', 1) : dir.toString('deg');
-        
+
         if ( type )
         {
             d1 = dir[1];
             d2 = dir[2];
-            
+
             if ( 'top' == d1 && !d2 )
                 return ( 2 == type ) ? 'left bottom, left top' : 'bottom';
             else if ( 'bottom' == d1 && !d2 )
@@ -1541,71 +1542,71 @@ var Gradient = CSSMin.Gradient = {
 *
 **/
 var Processor = CSSMin.Processor = function() {
-    this.enc = 'utf8'; 
-    this.basepath = null; 
-    this.input = false; 
-    this.output = false; 
-    
+    this.enc = 'utf8';
+    this.basepath = null;
+    this.input = false;
+    this.output = false;
+
     this.convertHSLA2RGBA = false;
     this.convertRGB2HEX = false;
-    
-    this.embedImports = false; 
-    this.embedImages = false; 
-    this.embedFonts = false; 
-    
+
+    this.embedImports = false;
+    this.embedImages = false;
+    this.embedFonts = false;
+
     this.removeComments = false;
     this.vendorPrefixes = false;
     this.applyPolyfills = false;
-    
+
     this.doMinify = true;
 };
 Processor.prototype = {
-   
+
     constructor: Processor,
-    
+
     enc: 'utf8',
     basepath: null,
     input: false,
     output: false,
-    
+
     convertHSLA2RGBA: false,
     convertRGB2HEX: false,
-    
+
     embedImports: false,
     embedImages: false,
     embedFonts: false,
-    
+
     removeComments: false,
     vendorPrefixes: false,
     applyPolyfills: false,
-    
+
     doMinify: true,
-    
+
     realPath: function(file, bpath)  {
         bpath = bpath || this.basepath;
-        if ( bpath ) return joinPath(bpath, file); 
+        if ( bpath ) return joinPath(bpath, file);
         else return file;
     },
-    
+
     //
     // adapted from node-commander package
     // https://github.com/visionmedia/commander.js/
     //
     parseArgs: function(args) {
-        var 
+        var
             Flags = {}, Options = {},  Params = [],
             optionname = '',  argumentforoption = false,
             arg,   index,  i, len
         ;
-        
+
         args = args || process.argv;
         // remove firt 2 args ('node' and 'this filename')
         args = args.slice(2);
-        
-        for (i = 0, len = args.length; i < len; ++i) 
+
+        for (i = 0, len = args.length; i < len; ++i)
         {
             arg = args[i];
-            if (arg.length > 1 && '-' == arg[0] && '-' != arg[1]) 
+            if (arg.length > 1 && '-' == arg[0] && '-' != arg[1])
             {
                 arg.slice(1).split('').forEach(function(c){
                     Flags[c] = true;
@@ -1628,8 +1629,8 @@ Processor.prototype = {
                     Options[optionname] = true;
                     argumentforoption = true;
                 }
-            } 
-            else 
+            }
+            else
             {
                 if (argumentforoption)
                 {
@@ -1642,13 +1643,13 @@ Processor.prototype = {
                 argumentforoption = false;
             }
         }
-        
+
         return {flags: Flags, options: Options, params: Params};
     },
 
     parse: function()  {
         var args, parsedargs;
-        
+
         parsedargs = this.parseArgs(process.argv);
         args = extend({
             'help' : false,
@@ -1665,7 +1666,7 @@ Processor.prototype = {
             'apply-polyfills' : false,
             'no-minify' : false
             }, parsedargs.options);
-        
+
         // if help is set, or no dependencis file, echo help message and exit
         if (parsedargs.flags['h'] || args['help'] || !args['input'] || !args['input'].length)
         {
@@ -1688,19 +1689,19 @@ Processor.prototype = {
             echo ("  --no-minify             whether to bypass minification of the css (default false)");
             echo ("  --basepath=PATH         file base path (OPTIONAL)");
             echo ();
-            
+
             exit(1);
         }
-        
+
         if ( args['basepath'] )
             this.basepath = args['basepath'];
         else
             // get real-dir of input file
             this.basepath = dirname( realpath( args['input'] ) ).replace( /[/\\]+$/, "" ) + DS;
-        
+
         this.input = args['input'];
         this.output = (args['output']) ? args['output'] : false;
-        
+
         this.convertHSLA2RGBA = (args['hsla2rgba']) ? true : false;
         this.convertRGB2HEX = (args['rgb2hex']) ? true : false;
         this.embedImports = (args['embed-imports']) ? true : false;
@@ -1714,9 +1715,9 @@ Processor.prototype = {
 
     convert_hsl2rgb: function(css) {
         var rx = CSSMin.Config.Regex.hsla, m, hsl, rgb;
-        
+
         rx.lastIndex = 0;
-        while ( m = rx.exec(css) ) 
+        while ( m = rx.exec(css) )
         {
             hsl = Color.get( [ m[1], m[2] ], 0, 'hsl' );
             rgb = hsl.toString('rgba');
@@ -1726,12 +1727,12 @@ Processor.prototype = {
         }
         return css;
     },
-    
+
     convert_rgb2hex: function(css, force) {
         var rx = CSSMin.Config.Regex.rgba, m, rgb, hex;
-        
+
         rx.lastIndex = 0;
-        while ( m = rx.exec(css) ) 
+        while ( m = rx.exec(css) )
         {
             rgb = Color.get( [ m[1], m[2] ], 0, 'rgb' );
             if ( force || !rgb.isTransparent() )
@@ -1742,13 +1743,13 @@ Processor.prototype = {
                 rx.lastIndex = m.index + hex.length;
             }
         }
-        
+
         return css;
     },
-    
+
     remove_comments: function(css) {
         // """Remove all CSS comment blocks."""
-        
+
         var iemac = false;
         var preserve = false;
         var comment_start = css.indexOf ("/*" ), comment_end;
@@ -1757,7 +1758,7 @@ Processor.prototype = {
             // Preserve comments that look like `/*!...*/` or `/**...*/`.
             // Slicing is used to make sure we don"t get an IndexError.
             preserve = false; //(css[comment_start + 2] /*$comment_start + 3*/ == "!")||(css[comment_start + 2] /*$comment_start + 3*/ == "*");
-            
+
             comment_end = css.indexOf( "*/", comment_start + 2 );
             if (comment_end<0)
             {
@@ -1796,16 +1797,16 @@ Processor.prototype = {
     },
 
     pseudoclasscolon: function(css) {
-        
+
         /**
         """
         Prevents 'p :link' from becoming 'p:link'.
-        
+
         Translates 'p :link' into 'p ___PSEUDOCLASSCOLON___link'; this is
         translated back again later.
         """
         **/
-        
+
         var rx = CSSMin.Config.Regex.pseudoclasscolon, m, rep;
         rx.lastIndex = 0;
         while ( m = rx.exec(css) )
@@ -1817,67 +1818,67 @@ Processor.prototype = {
         }
         return css;
     },
-        
+
     remove_unnecessary_whitespace: function(css)  {
         // """Remove unnecessary whitespace characters."""
-        
+
         css = this.pseudoclasscolon( css );
         // Remove spaces from before things.
         css = css.replace(CSSMin.Config.Regex.whitespace_start, '$1');
-        
+
         // Put the space back in for a few cases, such as `@media screen` and
         // `(-webkit-min-device-pixel-ratio:0)`.
         css = css.replace(CSSMin.Config.Regex.and, "and (");
-        
+
         // Put the colons back.
         css = str_replace('___PSEUDOCLASSCOLON___', ':', css);
-        
+
         // Remove spaces from after things.
         css = css.replace(CSSMin.Config.Regex.whitespace_end, '$1');
-        
+
         return css;
     },
 
     remove_unnecessary_semicolons: function(css) {
         // """Remove unnecessary semicolons."""
-        
+
         return css.replace(CSSMin.Config.Regex.semi, "}");
     },
 
     remove_empty_rules: function(css)  {
         // """Remove empty rules."""
-        
+
         return css.replace(CSSMin.Config.Regex.empty, '');
     },
-    
+
     condense_zero_units: function(css) {
         // """Replace `0(px, em, %, etc)` with `0`."""
-        
+
         return css.replace(CSSMin.Config.Regex.zero_units, '$1$2');
     },
 
     condense_multidimensional_zeros: function(css) {
         // """Replace `:0 0 0 0;`, `:0 0 0;` etc. with `:0;`."""
-        
+
         css = str_replace(":0 0 0 0;", ":0;", css);
         css = str_replace(":0 0 0;", ":0;", css);
         css = str_replace(":0 0;", ":0;", css);
-        
+
         // Revert `background-position:0;` to the valid `background-position:0 0;`.
         css = str_replace("background-position:0;", "background-position:0 0;", css);
-        
+
         return css;
     },
 
     condense_floating_points: function(css) {
         // """Replace `0.6` with `.6` where possible."""
-        
+
         return css.replace(CSSMin.Config.Regex.floating_points, '$1.$2');
     },
 
     condense_hex_colors: function(css) {
         // """Shorten colors from #AABBCC to #ABC where possible."""
-        
+
         var rx = CSSMin.Config.Regex.hex_color,  m, first, second, rep;
         rx.lastIndex = 0;
         while ( m = rx.exec(css) )
@@ -1897,19 +1898,19 @@ Processor.prototype = {
 
     condense_whitespace: function(css) {
         // """Condense multiple adjacent whitespace characters into one."""
-        
+
         return css.replace(CSSMin.Config.Regex.space, " ");
     },
 
     condense_semicolons: function(css) {
         // """Condense multiple adjacent semicolon characters into one."""
-        
+
         return css.replace(CSSMin.Config.Regex.semicolons, ";");
     },
 
     wrap_css_lines: function(css, line_length) {
         // """Wrap the lines of the given CSS to an approximate length."""
-        
+
         var lines = [], line_start = 0, str_len = css.length, i, ch;
         for (i=0; i<str_len; i++)
         {
@@ -1922,28 +1923,28 @@ Processor.prototype = {
             }
         }
         if ( line_start < str_len ) lines.push( css.substr( line_start ) );
-        
+
         return lines.join("\n");
     },
-    
+
     extract_urls: function(css) {
         // handle (relative) image/font urls in CSS
         var rx = CSSMin.Config.Regex.url, urls = [], tmp = [], m;
         rx.lastIndex = 0;
         while ( m = rx.exec(css) ) tmp.push( m[1] );
-        
+
         if ( tmp.length )
         {
             for (var i=0, l=tmp.length; i<l; i++)
             {
                 m = trim( trimd( trim( tmp[i] ), '\'"') );
-                
+
                 if ( isRelativePath( m ) ) urls.push( m );
             }
         }
         return urls;
     },
-    
+
     embed_images: function(css, urls) {
         var imgs = {'gif':1, 'png':1, 'jpg':1, 'jpeg':1},
             replace = {}, i, url, urlsLen = urls.length, ext, path, inline
@@ -1952,29 +1953,29 @@ Processor.prototype = {
         {
             url = urls[i];
             if ( replace[url] ) continue;
-            
+
             ext = url.split(".").pop().toLowerCase();
-            
+
             if ( imgs[ext] )
             {
                 path = this.realPath(url);
                 // convert binary data to base64 encoding
                 inline = base64_encode2( fs.readFileSync( path ) );
-                
+
                 // gif
                 if ( 'gif' == ext )
                     inline = 'data:image/gif;base64,'+inline;
-                
+
                 // png
                 else if ( 'png' == ext )
                     inline = 'data:image/png;base64,'+inline;
-                
+
                 // jpg/jpeg
                 else
                     inline = 'data:image/jpeg;base64,'+inline;
-                
+
                 css = str_replace(url, inline, css);
-                
+
                 replace[url] = 1;
             }
         }
@@ -1991,35 +1992,35 @@ Processor.prototype = {
             idpos = url.indexOf('#');
             id = (idpos>-1) ? url.substr(idpos) : '';
             fonturl = (idpos>-1) ? url.substr(0, idpos) : url;
-            
+
             if ( replace[fonturl] ) continue;
-            
+
             ext = fonturl.split(".").pop().toLowerCase();
-            
+
             if ( fonts[ext] )
             {
                 path = this.realPath(fonturl);
                 // convert binary data to base64 encoding
                 inline = base64_encode2( fs.readFileSync( path ) );
-                
+
                 // svg
                 if ( 'svg' == ext )
                     inline = 'data:font/svg;charset=utf-8;base64,'+inline;
-                
+
                 // ttf
                 else if ( 'ttf' == ext )
                     inline = 'data:font/ttf;charset=utf-8;base64,'+inline;
-                
+
                 // eot
                 else if ( 'eot' == ext )
                     inline = 'data:font/eot;charset=utf-8;base64,'+inline;
-                
+
                 // woff
                 else
                     inline = 'data:font/woff;charset=utf-8;base64,'+inline;
-                
+
                 css = str_replace(url, inline + id, css);
-                
+
                 replace[fonturl] = 1;
             }
         }
@@ -2030,7 +2031,7 @@ Processor.prototype = {
         // todo
         return css;
     },
-    
+
     remove_multiple_charset: function(css) {
         var rx = CSSMin.Config.Regex.charset, charset = null, times = 0, m;
         rx.lastIndex = 0;
@@ -2042,13 +2043,13 @@ Processor.prototype = {
             css = css.slice(0, m.index) + ' ' + css.slice(m.index+m[0].length);
             rx.lastIndex = m.index+1;
         }
-        
+
         if (charset)
             css = charset + "\n" + css;
-        
+
         return css;
     },
-    
+
     vendor_prefix_values: function(val, prefix1, pre1) {
         var vendor = CSSMin.Config.Vendor, prefixes = vendor['prefixes'], prefix,
             values = vendor['values'], valprefixes,
@@ -2075,7 +2076,7 @@ Processor.prototype = {
         }
         return str_replace(rv, val);
     },
-    
+
     vendor_prefix_explicit: function(css) {
         var vendor = CSSMin.Config.Vendor, prefixes = vendor['prefixes'], prefix,
             expl = vendor['explicit'], rx, m, p, i,
@@ -2110,7 +2111,7 @@ Processor.prototype = {
         }
         return [css, replacements];
     },
-    
+
     vendor_prefix_properties: function(css, prefix1, pre1) {
         var vendor = CSSMin.Config.Vendor, prefixes = vendor['prefixes'], prefix,
             propprefixes, props = vendor['properties'], rx, m, p, i,
@@ -2120,7 +2121,7 @@ Processor.prototype = {
         i = 0;
         rx = CSSMin.Config.Vendor.Regex['properties'];
         rx.lastIndex = 0;
-        while ( m = rx.exec(css) ) 
+        while ( m = rx.exec(css) )
         {
             p = m[4].toLowerCase();
             propprefixes = props[p];
@@ -2154,12 +2155,12 @@ Processor.prototype = {
         }
         return [css, replacements];
     },
-    
+
     vendor_prefix_atrules: function(css) {
         var vendor = CSSMin.Config.Vendor, prefixes = vendor['prefixes'], prefix,
-            atruleprefixes, atrules = vendor['atrules'], 
+            atruleprefixes, atrules = vendor['atrules'],
             rx, m, p, i, prefixed, replacements = {},
-            braces, start, start2,lent, ch, p2, id, rep, 
+            braces, start, start2,lent, ch, p2, id, rep,
             at_rule, at_rule_name, at_rule_body, at_rule_body_p, at_rule_body_replace, res,
             has_properties = vendor['properties'] ? 1 : 0,
             pre, prel = prefixes.length
@@ -2167,21 +2168,21 @@ Processor.prototype = {
         i = 0;
         rx = CSSMin.Config.Vendor.Regex['atrules'];
         rx.lastIndex = 0;
-        while ( m = rx.exec(css) ) 
+        while ( m = rx.exec(css) )
         {
             p = m[4].toLowerCase();
             atruleprefixes = atrules[p];
-            braces = 1; 
-            start = m.index + m[1].length + m[2].length; 
-            start2 = start + m[3].length; 
-            lent = 0; 
+            braces = 1;
+            start = m.index + m[1].length + m[2].length;
+            start2 = start + m[3].length;
+            lent = 0;
             while ( braces )
             {
                 ch = css[start2 + lent++];
                 if ('{' == ch) braces++;
                 else if ('}' == ch) braces--;
             }
-            
+
             at_rule = css.substr(start, m[3].length+lent);
             at_rule_name = m[5];
             at_rule_body = css.substr(start+ m[3].length, lent-1);
@@ -2190,7 +2191,7 @@ Processor.prototype = {
             for (pre=0; pre<prel; pre++)
             {
                 prefix = prefixes[pre][0];
-                
+
                 if ( prefix & atruleprefixes )
                 {
                     at_rule_body_p = at_rule_body + '';
@@ -2217,7 +2218,7 @@ Processor.prototype = {
         }
         return [css, replacements];
     },
-    
+
     vendor_prefixes: function(css) {
         var replace_atrules = null, replace_explicit = null,
             replace_properties = null, res, p,
@@ -2241,45 +2242,45 @@ Processor.prototype = {
             css = res[0];
             replace_properties = res[1];
         }
-        
+
         /*
             maybe other polyfills here..
         */
-        
+
         if ( replace_atrules )
             css = str_replace(replace_atrules, css);
 
         if ( replace_explicit )
             css = str_replace(replace_explicit, css);
-        
+
         if ( replace_properties )
             css = str_replace(replace_properties, css);
-        
+
         if ( replace_atrules || replace_properties || replace_explicit )
             css = this.condense_semicolons(css);
-        
+
         return css;
     },
-    
+
     gradient_polyfills: function(css) {
-        var rx = CSSMin.Config.Vendor.Regex['polyfills']['gradient'], 
+        var rx = CSSMin.Config.Vendor.Regex['polyfills']['gradient'],
             m, c, prefix, prop, grad, gradbody, dir, colors, col, polyfills,
             replacements = {}, rep, id, i = 0;
         polyfills = CSSMin.Config.Vendor['polyfills'];
         var leadingSpaceOrCommas = CSSMin.Config.Regex['leadingSpaceOrCommas'];
-        
+
         rx.lastIndex = 0;
-        while ( m = rx.exec(css) ) 
+        while ( m = rx.exec(css) )
         {
             prefix = m[1];
             prop = m[2].toLowerCase();
             grad = m[3].toLowerCase();
-            
+
             // todo
             if ( !polyfills[grad] ) continue;
-            
+
             i++;
-            
+
             gradbody = m[4].replace(/^(\(|\s+)/, '').toLowerCase();
             if ( dir = Gradient.parseDirection( gradbody ) )
             {
@@ -2288,7 +2289,7 @@ Processor.prototype = {
                 dir = dir[0];
             }
             gradbody = gradbody.replace(leadingSpaceOrCommas, '');
-            
+
             col = 0;
             colors = [];
             while ( c = Color.parse( gradbody, 1 ) )
@@ -2306,12 +2307,12 @@ Processor.prototype = {
             css = css.slice(0, m.index) + rep + css.slice(m.index+m[0].length);
             rx.lastIndex = m.index + rep.length;
         }
-        
+
         for (id in replacements)
         {
             if ( !HAS.call(replacements, id) ) continue;
-            
-            var repl = replacements[id], 
+
+            var repl = replacements[id],
                 prop = repl[2],
                 propspecial = 'background-image' == prop ? 'background-color' : prop,
                 grad = repl[3],
@@ -2320,9 +2321,9 @@ Processor.prototype = {
                 dir2 = Gradient.getDirection(repl[5], 2),
                 colorstops = repl[6].map( function(x){ return x.toColorStop(); } ).join(','),
                 colorstops2 = repl[6].map( function(x){ return x.toColorStop(2); } ).join(','),
-                colorfirst = repl[6][0].toString('hex'), 
+                colorfirst = repl[6][0].toString('hex'),
                 colorlast = repl[6][repl[6].length-1].toString('hex'),
-                polyfill = polyfills[ grad ], 
+                polyfill = polyfills[ grad ],
                 rep = []
             ;
             var r = {
@@ -2351,76 +2352,76 @@ Processor.prototype = {
         css = this.gradient_polyfills(css);
         return css;
     },
-    
+
     minify: function(css, wrap, commentsRemoved)  {
         wrap = wrap || null;
-        
+
         if ( !commentsRemoved )
             css = this.remove_comments(css);
-        
+
         css = this.condense_whitespace(css);
-        
+
         // A pseudo class for the Box Model Hack
         // (see http://tantek.com/CSS/Examples/boxmodelhack.html)
         css = str_replace('"\\"}\\""', "___PSEUDOCLASSBMH___", css);
-        
+
         css = this.remove_unnecessary_whitespace(css);
-        
+
         css = this.remove_unnecessary_semicolons(css);
-        
+
         css = this.condense_zero_units(css);
-        
+
         css = this.condense_multidimensional_zeros(css);
-        
+
         css = this.condense_floating_points(css);
-        
+
         css = this.condense_hex_colors(css);
-        
+
         if ( null!==wrap ) css = this.wrap_css_lines(css, wrap);
-        
+
         css = str_replace("___PSEUDOCLASSBMH___", '"\\"}\\""', css);
-        
+
         css = trim( this.condense_semicolons(css) );
-        
+
         return css;
     },
-    
+
     process: function(css, wrap)  {
         var urls;
-        
+
         if ( this.removeComments )
             css = this.remove_comments(css);
-        
+
         // todo
         //if ( this.embedImports )
         //    css = this.embed_imports(css);
-    
+
         css = this.remove_multiple_charset(css);
-        
+
         if ( this.applyPolyfills )
             css = this.apply_polyfills(css);
-        
+
         if ( this.convertHSLA2RGBA )
             css = this.convert_hsl2rgb(css);
         if ( this.convertRGB2HEX )
             css = this.convert_rgb2hex(css);
-        
+
         if ( this.vendorPrefixes )
             css = this.vendor_prefixes(css);
-        
+
         if ( this.doMinify )
         {
             console.log('cssmin minify is ON');
             css = this.minify(css, wrap || null, this.removeComments);
         }
-        
+
         if ( this.embedImages || this.embedFonts )
             urls = this.extract_urls(css);
         if ( this.embedImages )
             css = this.embed_images(css, urls);
         if ( this.embedFonts )
             css = this.embed_fonts(css, urls);
-        
+
         return css;
     }
 };
@@ -2428,7 +2429,7 @@ Processor.prototype = {
 // static
 CSSMin.Main = function() {
     var cssmin, css, mincss;
-    
+
     cssmin = new Processor();
     cssmin.parse( );
     if ( cssmin.input )
@@ -2441,7 +2442,7 @@ CSSMin.Main = function() {
 };
 
 // if called directly from command-line
-if ( isNode && require.main === module ) 
+if ( isNode && require.main === module )
     // run it
     CSSMin.Main();
 

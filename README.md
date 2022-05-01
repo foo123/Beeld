@@ -1,9 +1,9 @@
 Beeld
 =====
 
-**A scriptable, extendable and configurable source code builder framework and tool in Node.js / Python / PHP**
+**A scriptable, extendable and configurable source code builder framework and tool in JavaScript / Python / PHP**
 
-**version 1.0.1**
+**version 1.0.2**
 
 ![beeld is a bee that builds flowers](/beeld.jpg)
 

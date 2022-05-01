@@ -5,7 +5,7 @@
 #   https://github.com/foo123/Beeld
 #
 #   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-#   @version: 1.0.1
+#   @version: 1.0.2
 #
 ##
 
@@ -698,7 +698,7 @@ Xpresion.defaultConfiguration().defFunc({
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
 
-    VERSION = "1.0.1"
+    VERSION = "1.0.2"
 
     ROOT      = BEELD_ROOT
     INCLUDES  = BEELD_INCLUDES

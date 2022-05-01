@@ -2,7 +2,7 @@
 
 module.exports = {
 
-    beeld_plugin_minify: function( beelder ) {
+    beeld_plugin_minify: function(beelder) {
         var Beeld = beelder.getClass(),
             HAS = Object.prototype.hasOwnProperty,
             exec_async = require('child_process').exec,
@@ -11,7 +11,7 @@ module.exports = {
             echo_stderr = console.error,
             BEELD_COMPILERS = Beeld.Utils.join_path(Beeld.ROOT, "compilers") + '/'
         ;
-        var action_minify = function action_minify( evt ) {
+        var action_minify = function action_minify(evt) {
             var compilers = {
                 'cssmin': Beeld.Compiler(
                     'CSS Minifier',
@@ -38,35 +38,35 @@ module.exports = {
                 minify = current.action_cfg
             ;
 
-            if ( minify && !!data.src )
+            if (minify && !!data.src)
             {
                 // fix compiler selection
                 selected = HAS.call(params.cmd_opts,'compiler') && params.cmd_opts.compiler ? params.cmd_opts.compiler.toLowerCase() : null;
-                if ( selected && !HAS.call(compilers,selected) ) selected = 'uglifyjs';
+                if (selected && !HAS.call(compilers,selected)) selected = 'uglifyjs';
 
-                if ( HAS.call(minify,'uglifyjs') )
+                if (HAS.call(minify,'uglifyjs'))
                 {
                     // make it array
-                    compilers.uglifyjs.option([].concat( minify['uglifyjs'] ).join(" "));
-                    if ( !selected ) selected = 'uglifyjs';
+                    compilers.uglifyjs.option([].concat(minify['uglifyjs']).join(" "));
+                    if (!selected) selected = 'uglifyjs';
                 }
-                if ( HAS.call(minify,'closure') )
+                if (HAS.call(minify,'closure'))
                 {
                     // make it array
-                    compilers.closure.option([].concat( minify['closure'] ).join(" "));
-                    if ( !selected ) selected = 'closure';
+                    compilers.closure.option([].concat(minify['closure']).join(" "));
+                    if (!selected) selected = 'closure';
                 }
-                if ( HAS.call(minify,'yui') )
+                if (HAS.call(minify,'yui'))
                 {
                     // make it array
-                    compilers.yui.option([].concat( minify['yui'] ).join(" "));
-                    if ( !selected ) selected = 'yui';
+                    compilers.yui.option([].concat(minify['yui']).join(" "));
+                    if (!selected) selected = 'yui';
                 }
-                if ( HAS.call(minify,'cssmin') )
+                if (HAS.call(minify,'cssmin'))
                 {
                     // make it array
-                    compilers.cssmin.option([].concat( minify['cssmin'] ).join(" "));
-                    if ( !selected ) selected = 'cssmin';
+                    compilers.cssmin.option([].concat(minify['cssmin']).join(" "));
+                    if (!selected) selected = 'cssmin';
                 }
 
                 var cmd, extra = '', selectedCompiler = compilers[selected];
@@ -87,27 +87,27 @@ module.exports = {
                 ,['${IN}',           data.tmp_in]
                 ,['${OUT}',          data.tmp_out]
                 ]);
-                write_async( data.tmp_in, data.src, options.encoding, function( err ){
-                    if ( !err )
+                write_async(data.tmp_in, data.src, options.encoding, function(err) {
+                    if (!err)
                     {
                         // add some delay here
-                        setTimeout(function(){
+                        setTimeout(function() {
                             exec_async(cmd, null, function(err, stdout, stderr) {
-                                if ( stderr ) echo_stderr(stderr);
-                                if ( !err )
+                                if (stderr) echo_stderr(stderr);
+                                if (!err)
                                 {
                                     // add some delay here
-                                    setTimeout(function(){
-                                        read_async( data.tmp_out, options.encoding, function(err, file_data){
-                                            if ( !err )
+                                    setTimeout(function() {
+                                        read_async(data.tmp_out, options.encoding, function(err, file_data) {
+                                            if (!err)
                                             {
                                                 data.src = file_data;
-                                                evt.next( );
+                                                evt.next();
                                             }
                                             else
                                             {
                                                 data.err = 'Error reading minified file';
-                                                evt.abort( );
+                                                evt.abort();
                                             }
                                         });
                                     }, 100);
@@ -115,7 +115,7 @@ module.exports = {
                                 else
                                 {
                                     data.err = 'Error executing "'+cmd+'"';
-                                    evt.abort( );
+                                    evt.abort();
                                 }
                             });
                         }, 100);
@@ -123,13 +123,13 @@ module.exports = {
                     else
                     {
                         data.err = 'Error writing input file for minification';
-                        evt.abort( );
+                        evt.abort();
                     }
                 });
             }
             else
             {
-                evt.next( );
+                evt.next();
             }
         };
 

@@ -5,7 +5,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-*   @version: 1.0.1
+*   @version: 1.0.2
 *
 **/
 !function (root, name, factory) {
@@ -489,7 +489,7 @@ Beeld = function Beeld( ) {
     ,'action_out': Beeld.Actions.action_out
     };
 };
-Beeld.VERSION = "1.0.1";
+Beeld.VERSION = "1.0.2";
 Beeld.FILE      = BEELD_FILE;
 Beeld.ROOT      = BEELD_ROOT;
 Beeld.INCLUDES  = BEELD_INCLUDES;

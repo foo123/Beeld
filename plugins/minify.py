@@ -3,7 +3,7 @@ import os
 Beeld = None
 BEELD_COMPILERS = None
 
-def beeld_plugin_minify( beelder ):
+def beeld_plugin_minify(beelder):
     global Beeld
     global BEELD_COMPILERS
     Beeld = beelder.getClass() #BeeldClass
@@ -11,7 +11,7 @@ def beeld_plugin_minify( beelder ):
         BEELD_COMPILERS = os.path.join(Beeld.ROOT, 'compilers') + '/'
     beelder.addAction('minify', beeld_plugin_action_minify)
 
-def beeld_plugin_action_minify( evt ):
+def beeld_plugin_action_minify(evt):
     global Beeld
     global BEELD_COMPILERS
     compilers = {
@@ -96,10 +96,10 @@ def beeld_plugin_action_minify( evt ):
         # high-byte is the exit status
         if not (type(err) is int): err = 255 & (err[1]>>8)
 
-        if 0==err: data.src = Beeld.Utils.read(data.tmp_out, options.encoding)
+        if 0 == err: data.src = Beeld.Utils.read(data.tmp_out, options.encoding)
 
         # some error occured
-        if 0!=err:
+        if 0 != err:
             data.err = 'Error executing "'+cmd+'"'
             evt.abort()
             return

@@ -7,13 +7,12 @@
 * This is a simple script that contains a Python port of the YUI CSS Compressor so you can minify both CSS and JS
 *
 * Credits:
-*  Original cssmin.py ported from YUI here https://github.com/zacharyvoase/cssmin 
+*  Original cssmin.py ported from YUI here https://github.com/zacharyvoase/cssmin
 *
 *  Modified version of npp-cssmin adapted for PHP 5.2+
-*  v. 1.0.0
-*  @Nikos M.
+*  v. 1.0.1
 *
-*  NOTE: Does not yet support all vendor prefixes like js cssmin compiler does, 
+*  NOTE: Does not yet support all vendor prefixes like js cssmin compiler does,
 *  use js cssmin or py cssmin compiler instead if you need those
 **/
 
@@ -29,8 +28,8 @@ if (!function_exists('__echo'))
 function clamp($v, $m, $M) { return max(min($v, $M), $m); }
 
 // color format conversions
-function CSSMin_rgb2hex($r, $g, $b, $asPercent=false) 
-{ 
+function CSSMin_rgb2hex($r, $g, $b, $asPercent=false)
+{
     $per = 2.55;
     if ( $asPercent )
     {
@@ -41,53 +40,53 @@ function CSSMin_rgb2hex($r, $g, $b, $asPercent=false)
     $r = clamp(round($r), 0, 255);
     $g = clamp(round($g), 0, 255);
     $b = clamp(round($b), 0, 255);
-    
+
     /*$r = sprintf('%02X', $r);
     $g = sprintf('%02X', $g);
     $b = sprintf('%02X', $b);
     $hex = '#' . $r . $g . $b;*/
     $hex = sprintf('#%02X%02X%02X', $r, $g, $b);
-    
+
     return $hex;
 }
 
-function CSSMin_hex2rgb($hex, $asPercent=false) 
-{  
+function CSSMin_hex2rgb($hex, $asPercent=false)
+{
     $per = 100/255;
     $len = strlen($hex);
     if ( $len && '#' == $hex{0} ) $hex = substr($hex, 1);
-    
+
     $len = strlen($hex);
-    
-    if ( $len < 3 ) 
+
+    if ( $len < 3 )
         $rgb = array(0, 0, 0);
-    
+
     elseif (6 > $len )
         $rgb = array(
-            clamp( hexdec($hex[0].$hex[0]), 0, 255 ), 
-            clamp( hexdec($hex[1].$hex[1]), 0, 255 ), 
+            clamp( hexdec($hex[0].$hex[0]), 0, 255 ),
+            clamp( hexdec($hex[1].$hex[1]), 0, 255 ),
             clamp( hexdec($hex[2],$hex[2]), 0, 255 )
         );
-    
+
     else
         $rgb = array(
-            clamp( hexdec($hex[0].$hex[1]), 0, 255 ), 
-            clamp( hexdec($hex[2].$hex[3]), 0, 255 ), 
+            clamp( hexdec($hex[0].$hex[1]), 0, 255 ),
+            clamp( hexdec($hex[2].$hex[3]), 0, 255 ),
             clamp( hexdec($hex[4].$hex[5]), 0, 255 )
         );
-    
+
     if ( $asPercent )
     {
         $rgb = array(
-            ($rgb[0]*$per).'%', 
-            ($rgb[1]*$per).'%', 
+            ($rgb[0]*$per).'%',
+            ($rgb[1]*$per).'%',
             ($rgb[2]*$per).'%'
         );
     }
     return $rgb;
 }
 
-function CSSMin_hue2rgb($p, $q, $t) 
+function CSSMin_hue2rgb($p, $q, $t)
 {
     if ( $t < 0 ) $t += 1;
     if ( $t > 1 ) $t -= 1;
@@ -97,13 +96,13 @@ function CSSMin_hue2rgb($p, $q, $t)
     return $p;
 }
 
-function CSSMin_hsl2rgb($h, $s, $l) 
+function CSSMin_hsl2rgb($h, $s, $l)
 {
     // convert to [0, 1] range
     $h = (($h + 360)%360)/360;
     $s *= 0.01;
     $l *= 0.01;
-    
+
     if ( 0 == $s )
     {
         // achromatic
@@ -122,8 +121,8 @@ function CSSMin_hsl2rgb($h, $s, $l)
     }
 
     return array(
-        clamp( round($r * 255), 0, 255 ), 
-        clamp( round($g * 255), 0, 255 ),  
+        clamp( round($r * 255), 0, 255 ),
+        clamp( round($g * 255), 0, 255 ),
         clamp( round($b * 255), 0, 255 )
     );
 }
@@ -139,7 +138,7 @@ $CSSMin_vendor_prefixes = array(
         ,'transform-origin' => array('-webkit-', '-moz-', '-ms-', '-o-')
         ,'transform-style' => array('-webkit-', '-moz-', '-ms-', '-o-')
     ),
-        
+
     'explicit' => array(
         'border-top-left-radius' => array('-webkit-border-top-left-radius', '-moz-border-radius-topleft')
         ,'border-bottom-left-radius' => array('-webkit-border-bottom-left-radius', '-moz-border-radius-bottomleft')
@@ -148,7 +147,7 @@ $CSSMin_vendor_prefixes = array(
         ,'align-items' => array('-webkit-box-align', '-moz-box-align', '-ms-flex-align', '-webkit-align-items')
         ,'justify-content' => array('-webkit-box-pack', '-moz-box-pack', '-ms-flex-pack', '-webkit-justify-content')
     ),
-    
+
     'properties' => array(
         'animation' => array('-webkit-', '-moz-', '-ms-', '-o-')
         ,'animation-delay' => array('-webkit-', '-moz-', '-ms-', '-o-')
@@ -196,9 +195,11 @@ $CSSMin_Regex = (object)array(
     'hsla'=> '/\b(hsla|hsl)\s*\(([^\(\)]+)\)/miS',
     'rgba'=> '/\b(rgba|rgb)\s*\(([^\(\)]+)\)/miS',
     'pseudoclasscolon'=> '/(^|\})(([^\{\:])+\:)+([^\{]*\{)/',
-    'whitespace_start'=> '/\s+([!{};:>+\(\)\],])/',
+    //'whitespace_start'=> '/\s+([!{};:>+\(\)\],])/',
+    'whitespace_start'=> '/\s+([!{};:>\)\],])/',
     '_and'=> '/\band\(/i',
-    'whitespace_end'=> '/([!{}:;>+\(\[,])\s+/',
+    //'whitespace_end'=> '/([!{}:;>+\(\[,])\s+/',
+    'whitespace_end'=> '/([!{}:;>\(\[,])\s+/',
     'space'=> '/\s+/',
     'semi'=> '/;+\}/',
     'semicolons'=> '/;;+/',
@@ -220,11 +221,11 @@ foreach (array_keys($CSSMin_vendor_prefixes['properties']) as $p)
 foreach (array_keys($CSSMin_vendor_prefixes['atrules']) as $p)
     $CSSMin_Regex->vendor['atrule'][$p] = CSSMin_regex_vendor_value($p);
 
-       
+
 class CSSMin
 {
-    const VERSION = "1.0.0";
-    
+    const VERSION = "1.0.1";
+
     public $enc = false;
     public $input = false;
     public $output = false;
@@ -237,62 +238,62 @@ class CSSMin
     public $vendorPrefixes = false;
     public $HSLA2RGBA = false;
     public $RGB2HEX = false;
-    
-    public function __construct() 
-    { 
-        $this->enc = false; 
-        $this->input = false; 
-        $this->output = false; 
-        $this->embedImages = false; 
-        $this->embedFonts = false; 
-        $this->embedImports = false; 
+
+    public function __construct()
+    {
+        $this->enc = false;
+        $this->input = false;
+        $this->output = false;
+        $this->embedImages = false;
+        $this->embedFonts = false;
+        $this->embedImports = false;
         $this->removeComments = false;
-        $this->noMinify = false; 
-        $this->vendorPrefixes = false; 
+        $this->noMinify = false;
+        $this->vendorPrefixes = false;
         $this->HSLA2RGBA = false;
         $this->RGB2HEX = false;
-        $this->realpath = null; 
+        $this->realpath = null;
     }
-   
+
     public function CSSMin() { $this->__construct();  }
-   
+
     // simulate python's "startswith" string method
     /*protected function startsWith($s, $prefix) { return ($prefix==substr($s, 0, strlen($prefix))); }*/
     protected function startsWith($s, $prefix) { return (0===strncmp($s, $prefix, strlen($prefix))); }
-    
+
     public function read($file) { return file_get_contents($file); }
 
     public function write($file, $text) { return file_put_contents($file, $text); }
 
     // https://github.com/JosephMoniz/php-path
-    protected function joinPath() 
+    protected function joinPath()
     {
         $args = func_get_args();
         $argslen = count($args);
         $DS = DIRECTORY_SEPARATOR;
-        
+
         if (!$argslen)  return ".";
-        
+
         $path = implode($DS, $args);
         $plen = strlen($path);
-        
+
         if (!$plen) return ".";
-        
+
         $isAbsolute    = $path[0];
         $trailingSlash = $path[$plen - 1];
 
         $peices = array_values( array_filter( preg_split('#/|\\\#', $path), 'strlen' ) );
-        
+
         $new_path = array();
         $up = 0;
         $i = count($peices)-1;
         while ($i>=0)
         {
             $last = $peices[$i];
-            if ($last == "..") 
+            if ($last == "..")
             {
                 $up++;
-            } 
+            }
             elseif ($last != ".")
             {
                 if ($up)  $up--;
@@ -300,87 +301,87 @@ class CSSMin
             }
             $i--;
         }
-        
+
         $path = implode($DS, array_reverse($new_path));
-        
-        if (!$path && !$isAbsolute) 
+
+        if (!$path && !$isAbsolute)
         {
             $path = ".";
         }
 
-        if ($path && $trailingSlash == $DS /*"/"*/) 
+        if ($path && $trailingSlash == $DS /*"/"*/)
         {
             $path .= $DS /*"/"*/;
         }
 
         return ($isAbsolute == $DS /*"/"*/ ? $DS /*"/"*/ : "") . $path;
     }
-    
+
     protected function isRelativePath($file)
     {
-        
+
         if (
-            self::startsWith($file, 'http://') || 
+            self::startsWith($file, 'http://') ||
             self::startsWith($file, 'https://') ||
             self::startsWith($file, '/') ||
             self::startsWith($file, '\\')
         )
             return false;
         elseif (
-            self::startsWith($file, './') || 
-            self::startsWith($file, '../') || 
-            self::startsWith($file, '.\\') || 
+            self::startsWith($file, './') ||
+            self::startsWith($file, '../') ||
+            self::startsWith($file, '.\\') ||
             self::startsWith($file, '..\\') ||
             preg_match('/[a-z0-9_]/i', $file[0])
         )
             return true;
-            
+
         // unknown
         return false;
     }
-    
+
     protected function realPath($file, $rpath=null)
     {
         $rpath = ($rpath) ? $rpath : $this->realpath;
-        if ( $rpath ) return $this->joinPath($rpath, $file); 
+        if ( $rpath ) return $this->joinPath($rpath, $file);
         else return $file;
     }
-    
+
     /**
      * parseArgs Command Line Interface (CLI) utility function.
      * @author              Patrick Fisher <patrick@pwfisher.com>
      * @see                 https://github.com/pwfisher/CommandLine.php
      */
-    protected function parseArgs($argv = null) 
+    protected function parseArgs($argv = null)
     {
         $argv = $argv ? $argv : $_SERVER['argv']; array_shift($argv); $o = array();
-        for ($i = 0, $j = count($argv); $i < $j; $i++) 
-        { 
+        for ($i = 0, $j = count($argv); $i < $j; $i++)
+        {
             $a = $argv[$i];
-            if (substr($a, 0, 2) == '--') 
-            { 
+            if (substr($a, 0, 2) == '--')
+            {
                 $eq = strpos($a, '=');
                 if ($eq !== false) {  $o[substr($a, 2, $eq - 2)] = substr($a, $eq + 1); }
-                else 
-                { 
+                else
+                {
                     $k = substr($a, 2);
                     if ($i + 1 < $j && $argv[$i + 1][0] !== '-') { $o[$k] = $argv[$i + 1]; $i++; }
-                    else if (!isset($o[$k])) { $o[$k] = true; } 
-                } 
+                    else if (!isset($o[$k])) { $o[$k] = true; }
+                }
             }
-            else if (substr($a, 0, 1) == '-') 
+            else if (substr($a, 0, 1) == '-')
             {
                 if (substr($a, 2, 1) == '=') { $o[substr($a, 1, 1)] = substr($a, 3); }
-                else 
+                else
                 {
                     foreach (str_split(substr($a, 1)) as $k) { if (!isset($o[$k])) { $o[$k] = true; } }
-                    if ($i + 1 < $j && $argv[$i + 1][0] !== '-') { $o[$k] = $argv[$i + 1]; $i++; } 
-                } 
+                    if ($i + 1 < $j && $argv[$i + 1][0] !== '-') { $o[$k] = $argv[$i + 1]; $i++; }
+                }
             }
             else { $o[] = $a; } }
         return $o;
     }
-    
+
     public function parse()
     {
         $defaultArgs=array(
@@ -401,7 +402,7 @@ class CSSMin
         $args = $this->parseArgs();
         $args = array_intersect_key($args, $defaultArgs);
         $args = array_merge($defaultArgs, $args);
-        
+
         if (
             ($args['h'] || $args['help']) ||
             (!isset($args['input']) || !$args['input'] || !is_string($args['input']) || 0==strlen($args['input']))
@@ -410,7 +411,7 @@ class CSSMin
             // If no dependencies have been passed or help is set, show the help message and exit
             $p = pathinfo(__FILE__);
             $thisFile = (isset($p['extension'])) ? $p['filename'].'.'.$p['extension'] : $p['filename'];
-            
+
             __echo ("usage: $thisFile [-h] [--no-minify] [--remove-comments] [--vendor-prefixes] [--hsla2rgba] [--rgb2hex] [--embed-images] [--embed-fonts] [--embed-imports] [--basepath=PATH] [--input=FILE] [--output=FILE]");
             __echo ();
             __echo ("Process and Minify CSS Files (v. ".CSSMin::VERSION.")");
@@ -429,16 +430,16 @@ class CSSMin
             __echo ("  --no-minify             whether to bypass minification of the css (default false)");
             __echo ("  --basepath=PATH         file base path (OPTIONAL)");
             __echo ();
-            
+
             exit(1);
         }
-        
+
         if ( $args['basepath'] )
             $this->realpath = $args['basepath'];
         else
             // get real-dir of input file
             $this->realpath = rtrim(dirname( realpath($args['input']) ), "/\\" ).DIRECTORY_SEPARATOR;
-            
+
         $this->input = $args['input'];
         $this->output = (isset($args['output'])) ? $args['output'] : false;
         $this->embedImages = (isset($args['embed-images']) && $args['embed-images']) ? true : false;
@@ -450,53 +451,53 @@ class CSSMin
         $this->HSLA2RGBA = (isset($args['hsla2rgba']) && $args['hsla2rgba']) ? true : false;
         $this->RGB2HEX = (isset($args['rgb2hex']) && $args['rgb2hex']) ? true : false;
     }
-    
-    public function convert_hsl2rgb($css) 
+
+    public function convert_hsl2rgb($css)
     {
         global $CSSMin_Regex;
-        $rx = $CSSMin_Regex->hsla; 
+        $rx = $CSSMin_Regex->hsla;
         $per = 100/255;
         $offset = 0;
-        while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
+        while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) )
         {
             $isHSLA = 'hsla'==$m[1][0] || 'HSLA'==$m[1][0];
-            
+
             $hsl = explode(',', trim($m[2][0]));
-            
+
             $h = floatval(trim($hsl[0]));
-            
+
             $s = trim($hsl[1]);
             if ( false !== strpos($s, '%') ) $s = floatval($s);
             else $s = floatval($s)*$per;
-            
+
             $l = trim($hsl[2]);
             if ( false !== strpos($l, '%') ) $l = floatval($l);
             else $l = floatval($l)*$per;
-            
+
             $rgb = CSSMin_hsl2rgb($h, $s, $l);
             if ( $isHSLA )
                 $rgb = 'rgba(' . implode(',', $rgb) . ',' . $hsl[3] . ')';
             else
                 $rgb = 'rgb(' . implode(',', $rgb) . ')';
-                
+
             //$css = str_replace($m[0][0], $rgb . ' ', $css);
             $css = substr($css, 0, $m[0][1]) . $rgb . substr($css, $m[0][1]+strlen($m[0][0]));
             $offset = $m[0][1] + strlen($rgb);
         }
         return $css;
     }
-        
-    public function convert_rgb2hex($css) 
+
+    public function convert_rgb2hex($css)
     {
         global $CSSMin_Regex;
-        $rx = $CSSMin_Regex->rgba; 
+        $rx = $CSSMin_Regex->rgba;
         $rep = array();
         $i = 0;
         $offset = 0;
-        while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
+        while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) )
         {
             $isRGBA = 'rgba'==strtolower($m[1][0]);
-            if ( $isRGBA ) 
+            if ( $isRGBA )
             {
                 // bypass
                 $i++;
@@ -509,19 +510,19 @@ class CSSMin
             else
             {
                 $rgb = explode(',', trim($m[2][0]));
-                
+
                 $r = trim($rgb[0]);
                 if ( false !== strpos($r, '%') ) $r = floatval($r)*2.55;
                 else $r = floatval($r);
-                
+
                 $g = trim($rgb[1]);
                 if ( false !== strpos($g, '%') ) $g = floatval($g)*2.55;
                 else $g = floatval($g);
-                
+
                 $b = trim($rgb[2]);
                 if ( false !== strpos($b, '%') ) $b = floatval($b)*2.55;
                 else $b = floatval($b);
-                
+
                 $hex = CSSMin_rgb2hex($r, $g, $b);
                 //$css = str_replace($m[0][0], $hex . ' ', $css);
                 $css = substr($css, 0, $m[0][1]) . $hex . substr($css, $m[0][1]+strlen($m[0][0]));
@@ -529,14 +530,14 @@ class CSSMin
             }
         }
         $css = str_replace(array_keys($rep), array_values($rep), $css);
-        
+
         return $css;
     }
-        
+
     public function remove_comments($css)
     {
         // """Remove all CSS comment blocks."""
-        
+
         $iemac = false;
         $preserve = false;
         $comment_start = strpos($css, "/*");
@@ -545,7 +546,7 @@ class CSSMin
             // Preserve comments that look like `/*!...*/` or `/**...*/`.
             // Slicing is used to make sure we don"t get an IndexError.
             $preserve = false;//(bool)($css[$comment_start + 2] /*$comment_start + 3*/ == "!" || $css[$comment_start + 2] /*$comment_start + 3*/ == "*");
-            
+
             $comment_end = strpos($css, "*/", $comment_start + 2);
             if (false===$comment_end)
             {
@@ -585,16 +586,16 @@ class CSSMin
 
     protected function pseudoclasscolon($css)
     {
-        
+
         /**
         """
         Prevents 'p :link' from becoming 'p:link'.
-        
+
         Translates 'p :link' into 'p ___PSEUDOCLASSCOLON___link'; this is
         translated back again later.
         """
         **/
-        
+
         global $CSSMin_Regex;
         $rx = $CSSMin_Regex->pseudoclasscolon;
         $offset = 0;
@@ -607,26 +608,26 @@ class CSSMin
         }
         return $css;
     }
-        
+
     public function remove_unnecessary_whitespace($css)
     {
         // """Remove unnecessary whitespace characters."""
-        
+
         global $CSSMin_Regex;
         $css = $this->pseudoclasscolon($css);
         // Remove spaces from before things.
         $css = preg_replace($CSSMin_Regex->whitespace_start, '$1', $css);
-        
+
         // Put the space back in for a few cases, such as `@media screen` and
         // `(-webkit-min-device-pixel-ratio:0)`.
         $css = preg_replace($CSSMin_Regex->_and, "and (", $css);
-        
+
         // Put the colons back.
         $css = str_replace('___PSEUDOCLASSCOLON___', ':', $css);
-        
+
         // Remove spaces from after things.
         $css = preg_replace($CSSMin_Regex->whitespace_end, '$1', $css);
-        
+
         return $css;
     }
 
@@ -634,7 +635,7 @@ class CSSMin
     public function remove_unnecessary_semicolons($css)
     {
         // """Remove unnecessary semicolons."""
-        
+
         global $CSSMin_Regex;
         return preg_replace($CSSMin_Regex->semi, "}", $css);
     }
@@ -642,7 +643,7 @@ class CSSMin
     public function remove_empty_rules($css)
     {
         // """Remove empty rules."""
-        
+
         global $CSSMin_Regex;
         return preg_replace($CSSMin_Regex->_empty, "", $css);
     }
@@ -650,7 +651,7 @@ class CSSMin
     public function condense_zero_units($css)
     {
         // """Replace `0(px, em, %, etc)` with `0`."""
-        
+
         global $CSSMin_Regex;
         return preg_replace($CSSMin_Regex->zero_units, '$1$2', $css);
     }
@@ -658,21 +659,21 @@ class CSSMin
     public function condense_multidimensional_zeros($css)
     {
         // """Replace `:0 0 0 0;`, `:0 0 0;` etc. with `:0;`."""
-        
+
         $css = str_replace(":0 0 0 0;", ":0;", $css);
         $css = str_replace(":0 0 0;", ":0;", $css);
         $css = str_replace(":0 0;", ":0;", $css);
-        
+
         // Revert `background-position:0;` to the valid `background-position:0 0;`.
         $css = str_replace("background-position:0;", "background-position:0 0;", $css);
-        
+
         return $css;
     }
 
     public function condense_floating_points($css)
     {
         // """Replace `0.6` with `.6` where possible."""
-        
+
         global $CSSMin_Regex;
         return preg_replace($CSSMin_Regex->floating_points, '$1.$2', $css);
     }
@@ -680,7 +681,7 @@ class CSSMin
     public function condense_hex_colors($css)
     {
         // """Shorten colors from #AABBCC to #ABC where possible."""
-        
+
         global $CSSMin_Regex;
         $rx = $CSSMin_Regex->hex_color;
         $offset=0;
@@ -706,7 +707,7 @@ class CSSMin
     public function condense_whitespace($css)
     {
         // """Condense multiple adjacent whitespace characters into one."""
-        
+
         global $CSSMin_Regex;
         return preg_replace($CSSMin_Regex->space, " ", $css);
     }
@@ -714,7 +715,7 @@ class CSSMin
     public function condense_semicolons($css)
     {
         // """Condense multiple adjacent semicolon characters into one."""
-        
+
         global $CSSMin_Regex;
         return preg_replace($CSSMin_Regex->semicolons, ";", $css);
     }
@@ -722,7 +723,7 @@ class CSSMin
     public function wrap_css_lines($css, $line_length)
     {
         // """Wrap the lines of the given CSS to an approximate length."""
-        
+
         $lines = array();
         $line_start = 0;
         $str_len = strlen($css);
@@ -737,10 +738,10 @@ class CSSMin
             }
         }
         if ($line_start < $str_len) $lines[] = substr($css, $line_start);
-        
+
         return implode("\n", $lines);
     }
-    
+
     protected function extract_urls($css)
     {
         // handle (relative) image/font urls in CSS
@@ -754,13 +755,13 @@ class CSSMin
             foreach ($matches as $match)
             {
                 $url = trim( trim( trim( $match ), '"\'' ) );
-                
+
                 if ( $this->isRelativePath($url) ) $urls[] = $url;
             }
         }
         return $urls;
     }
-    
+
     public function embed_images($css, $urls)
     {
         $imgs = array('gif', 'png', 'jpg', 'jpeg');
@@ -768,28 +769,28 @@ class CSSMin
         foreach ($urls as $url)
         {
             if ( isset($replace[$url]) && $replace[$url] ) continue;
-            
+
             $ext = strtolower(end(explode(".", $url)));
-            
+
             if ( in_array($ext, $imgs) )
             {
                 $path = $this->realPath($url);
                 $inline = base64_encode(file_get_contents($path));
-                
+
                 // gif
                 if ( 'gif' == $ext )
                     $inline = 'data:image/gif;base64,'.$inline;
-                
+
                 // png
                 elseif ( 'png' == $ext )
                     $inline = 'data:image/png;base64,'.$inline;
-                
+
                 // jpg/jpeg
                 else
                     $inline = 'data:image/jpeg;base64,'.$inline;
-                
+
                 $css = str_replace($url, $inline, $css);
-                
+
                 $replace[$url] = 1;
             }
         }
@@ -805,47 +806,47 @@ class CSSMin
             $idpos = strpos($url, '#');
             $id = (false!==$idpos) ? substr($url, $idpos) : '';
             $fonturl = (false!==$idpos) ? substr($url, 0, $idpos) : $url;
-            
+
             if ( isset($replace[$fonturl]) && $replace[$fonturl] ) continue;
-            
+
             $ext = strtolower(end(explode(".", $fonturl)));
-            
+
             if ( in_array($ext, $fonts) )
             {
                 $path = $this->realPath($fonturl);
                 $inline = base64_encode(file_get_contents($path));
-                
+
                 // svg
                 if ( 'svg' == $ext )
                     $inline = 'data:font/svg;charset=utf-8;base64,'.$inline;
-                
+
                 // ttf
                 elseif ( 'ttf' == $ext )
                     $inline = 'data:font/ttf;charset=utf-8;base64,'.$inline;
-                
+
                 // eot
                 elseif ( 'eot' == $ext )
                     $inline = 'data:font/eot;charset=utf-8;base64,'.$inline;
-                
+
                 // woff
                 else
                     $inline = 'data:font/woff;charset=utf-8;base64,'.$inline;
-                
+
                 $css = str_replace($url, $inline.$id, $css);
-                
+
                 $replace[$fonturl] = 1;
             }
         }
         return $css;
     }
 
-    public function embed_imports($css) 
+    public function embed_imports($css)
     {
         // todo
         return $css;
     }
-    
-    public function remove_multiple_charset($css) 
+
+    public function remove_multiple_charset($css)
     {
         global $CSSMin_Regex;
         $rx = $CSSMin_Regex->charset;
@@ -859,14 +860,14 @@ class CSSMin
             $css = substr($css, 0, $m[0][1]) . '' . substr($css, $m[0][1]+strlen($m[0][0]));
             $offset = $m[0][1];
         }
-        
+
         if ( $charset )
             $css = $charset . "\n" . $css;
-        
+
         return $css;
     }
-        
-    public function vendor_prefix_values($val, $prefix) 
+
+    public function vendor_prefix_values($val, $prefix)
     {
         global $CSSMin_vendor_prefixes, $CSSMin_Regex;
         $values = array_keys($CSSMin_vendor_prefixes['values']);
@@ -876,7 +877,7 @@ class CSSMin
         {
             $rx = $CSSMin_Regex->vendor['value'][$v];
             $offset = 0;
-            while ( preg_match($rx, $val, $m, PREG_OFFSET_CAPTURE, $offset) ) 
+            while ( preg_match($rx, $val, $m, PREG_OFFSET_CAPTURE, $offset) )
             {
                 $i++;
                 $id = '__[[value_'.$i.']]__';
@@ -890,8 +891,8 @@ class CSSMin
         $val = str_replace(array_keys($rv), array_values($rv), $val);
         return $val;
     }
-        
-    public function vendor_prefix_explicit($css) 
+
+    public function vendor_prefix_explicit($css)
     {
         global $CSSMin_vendor_prefixes, $CSSMin_Regex;
         $expl = $CSSMin_vendor_prefixes['explicit'];
@@ -902,7 +903,7 @@ class CSSMin
             $l = count($prefixes);
             $rx = $CSSMin_Regex->vendor['explicit'][$p];
             $offset = 0;
-            while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
+            while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) )
             {
                 $css = explode($m[0][0], $css);
                 $prefixed = array();
@@ -922,8 +923,8 @@ class CSSMin
         }
         return array($css, $replacements);
     }
-        
-    public function vendor_prefix_properties($css, $prefix=null) 
+
+    public function vendor_prefix_properties($css, $prefix=null)
     {
         global $CSSMin_vendor_prefixes, $CSSMin_Regex;
         $props = $CSSMin_vendor_prefixes['properties'];
@@ -934,7 +935,7 @@ class CSSMin
             $l = count($prefixes);
             $rx = $CSSMin_Regex->vendor['property'][$p];
             $offset = 0;
-            while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
+            while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) )
             {
                 $css = explode($m[0][0], $css);
                 $prefixed = array();
@@ -961,8 +962,8 @@ class CSSMin
         }
         return array($css, $replacements);
     }
-        
-    public function vendor_prefix_atrules($css) 
+
+    public function vendor_prefix_atrules($css)
     {
         global $CSSMin_vendor_prefixes, $CSSMin_Regex;
         $atrules = $CSSMin_vendor_prefixes['atrules'];
@@ -974,11 +975,11 @@ class CSSMin
             $l = count($prefixes);
             $rx = $CSSMin_Regex->vendor['atrule'][$p];
             $offset = 0;
-            while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) ) 
+            while ( preg_match($rx, $css, $m, PREG_OFFSET_CAPTURE, $offset) )
             {
-                $braces = 1; 
-                $start = $m[0][1] + strlen($m[1][0]) + strlen($m[2][0]); 
-                $start2 = $start + strlen($m[3][0]); 
+                $braces = 1;
+                $start = $m[0][1] + strlen($m[1][0]) + strlen($m[2][0]);
+                $start2 = $start + strlen($m[3][0]);
                 $lent = 0; //$ch = ' ';
                 while ( $braces )
                 {
@@ -986,7 +987,7 @@ class CSSMin
                     if ('{' == $ch) $braces++;
                     else if ('}' == $ch) $braces--;
                 }
-                
+
                 $at_rule = substr($css, $start, strlen($m[3][0])+$lent);
                 $at_rule_name = $m[5][0];
                 $at_rule_body = substr($css, $start+ strlen($m[3][0]), $lent-1);
@@ -1015,11 +1016,11 @@ class CSSMin
         }
         return array($css, $replacements);
     }
-        
+
     public function vendor_prefixes($css)
     {
         global $CSSMin_vendor_prefixes;
-        
+
         if ( !empty($CSSMin_vendor_prefixes) )
         {
             $replace_atrules = null;
@@ -1043,86 +1044,86 @@ class CSSMin
                 $css = $res[0];
                 $replace_properties = $res[1];
             }
-            
+
             if ( !empty($replace_atrules) )
                 $css = str_replace(array_keys($replace_atrules), array_values($replace_atrules), $css);
-            
+
             if ( !empty($replace_explicit) )
                 $css = str_replace(array_keys($replace_explicit), array_values($replace_explicit), $css);
-            
+
             if ( !empty($replace_properties) )
                 $css = str_replace(array_keys($replace_properties), array_values($replace_properties), $css);
-                
+
             $css = $this->condense_semicolons($css);
         }
         return $css;
     }
-    
+
     public function minify($css, $wrap=null, $commentsRemoved=false)
     {
         if ( !$commentsRemoved )
             $css = $this->remove_comments($css);
-        
+
         $css = $this->condense_whitespace($css);
-        
+
         // A pseudo class for the Box Model Hack
         // (see http://tantek.com/CSS/Examples/boxmodelhack.html)
         $css = str_replace('"\\"}\\""', "___PSEUDOCLASSBMH___", $css);
-        
+
         $css = $this->remove_unnecessary_whitespace($css);
-        
+
         $css = $this->remove_unnecessary_semicolons($css);
-        
+
         $css = $this->condense_zero_units($css);
-        
+
         $css = $this->condense_multidimensional_zeros($css);
-        
+
         $css = $this->condense_floating_points($css);
-        
+
         //$css = $this->normalize_rgb_colors_to_hex($css);
-        
+
         $css = $this->condense_hex_colors($css);
-        
+
         if ( null!==$wrap ) $css = $this->wrap_css_lines($css, $wrap);
-        
+
         $css = str_replace("___PSEUDOCLASSBMH___", '"\\"}\\""', $css);
-        
+
         $css = trim( $this->condense_semicolons($css) );
-        
+
         return $css;
     }
-    
+
     public function process($css, $wrap=null)
     {
         if ( $this->removeComments )
             $css = $this->remove_comments($css);
-        
+
         //if ( $this->embedImports )
         //    $css = $this->embed_imports($css);
-        
+
         $css = $this->remove_multiple_charset($css);
-            
+
         if ( $this->HSLA2RGBA )
             $css = $this->convert_hsl2rgb($css);
         if ( $this->RGB2HEX )
             $css = $this->convert_rgb2hex($css);
-            
+
         if ( $this->vendorPrefixes )
             $css = $this->vendor_prefixes($css);
-        
+
         if ( !$this->noMinify )
             $css = $this->minify($css, $wrap, $this->removeComments);
-        
+
         if ( $this->embedImages || $this->embedFonts )
             $urls = $this->extract_urls($css);
         if ( $this->embedImages )
             $css = $this->embed_images($css, $urls);
         if ( $this->embedFonts )
             $css = $this->embed_fonts($css, $urls);
-        
+
         return $css;
     }
-    
+
     // static
     public static function Main()
     {

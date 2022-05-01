@@ -1,12 +1,11 @@
 <?php
-function beeld_plugin_minify( $beelder )
+function beeld_plugin_minify($beelder)
 {
-    if ( !defined('BEELD_COMPILERS') )
+    if (!defined('BEELD_COMPILERS'))
         define('BEELD_COMPILERS', BEELD_ROOT . 'compilers' . DIRECTORY_SEPARATOR);
     $beelder->addAction('minify', 'beeld_plugin_action_minify');
 }
-
-function beeld_plugin_action_minify( $evt )
+function beeld_plugin_action_minify($evt)
 {
     $compilers = array(
     'cssmin' => Beeld::Compiler(
@@ -31,11 +30,11 @@ function beeld_plugin_action_minify( $evt )
     $data =& $params->data;
     $current =& $params->current;
     $minify = $current->action_cfg;
-    if ( $minify && !empty($data->src) )
+    if ($minify && !empty($data->src))
     {
         // fix compiler selection
         $selected = isset($params->cmd_opts['compiler']) ? strtolower(strval($params->cmd_opts['compiler'])) : null;
-        if ( $selected && !isset($compilers[ $selected ]) ) $selected = 'uglifyjs';
+        if ($selected && !isset($compilers[$selected])) $selected = 'uglifyjs';
 
         $minify = (array)$minify;
 
@@ -87,11 +86,11 @@ function beeld_plugin_action_minify( $evt )
         exec($cmd . ' 2>&1', $out, $err);
 
         // some error occured
-        if ( $err )
+        if ($err)
         {
             $data->err = 'Error executing "'.$cmd.'"';
             BeeldUtils::echo_stderr(implode(PHP_EOL, (array)$out));
-            $evt->abort( );
+            $evt->abort();
             return;
         }
         else
@@ -99,6 +98,6 @@ function beeld_plugin_action_minify( $evt )
             $data->src = BeeldUtils::read($data->tmp_out);
         }
     }
-    $evt->next( );
+    $evt->next();
 }
 

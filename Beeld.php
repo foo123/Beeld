@@ -6,7 +6,7 @@
 *   https://github.com/foo123/Beeld
 *
 *   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-*   @version: 1.0.1
+*   @version: 1.0.2
 *
 **/
 if (!class_exists('Beeld'))
@@ -851,7 +851,7 @@ final class BeeldActions
 // extends/implements PublishSubscribe
 class Beeld extends PublishSubscribe
 {
-    const VERSION = "1.0.1";
+    const VERSION = "1.0.2";
     public static $Parsers = null;
 
     public $actions = null;
