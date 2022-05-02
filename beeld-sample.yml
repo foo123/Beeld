@@ -16,7 +16,7 @@
     # prefix id for dynamic expressions (via Xpresion) used in config parameters, parsed and evaluated automaticaly
     "Xpresion": "Xpresion::"
     # prefix id for any reguilar expressions might be used in config parameters, parsed and evaluated automaticaly
-    "RegExp": "RegExp::" 
+    "RegExp": "RegExp::"
 
 
 ##
@@ -27,6 +27,8 @@
     - "minify": "!plg:minify"
     # include 'doc' plugin from plugins folder
     - "doc": "!plg:doc"
+    # include 'inc' plugin from plugins folder
+    - "inc": "!plg:inc"
 
 
 ##
@@ -62,6 +64,11 @@
             - "@@MODULE_NAME@@": "ModelView"
             - "@@VERSION@@": "0.51"
             - "@@DATE@@": 'Xpresion::date("Y-m-d H:i:s")'
+        # include/exclude code marked with /*#ifdef(foo)*/../*#endif*/, /*#ifndef(moo)*/../*#endif*/, etc..
+        - "inc":  #(map)
+            "prefix": "/*"
+            "suffix": "*/"
+            "define": "foo,bar"
         # allow some pre-process to take place (shell scripting)
         - "process-shell":  #(list)
             - "echo ^/^*^*[DOC_MARKDOWN] >> ${IN}"
@@ -80,7 +87,7 @@
             - "echo ^/^/ postprocessed2 >> ${IN}"
             - "type ${IN} > ${OUT}"
         #(key-value)
-        - "out": "./build/modelview.js"  
+        - "out": "./build/modelview.js"
     # TASK 2 "minify": makes the .min.js file
     - "minify":  #(ordered map)
         - "src":  #(list)

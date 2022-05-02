@@ -1,18 +1,19 @@
 {
 "settings":{
     "Xpresion": "Xpresion::",
-    "RegExp": "RegExp::" 
+    "RegExp": "RegExp::"
 },
 
 "plugins":[
     {"minify": "!plg:minify"},
     {"doc": "!plg:doc"}
+    {"inc": "!plg:inc"}
 ],
 
 "tasks":[
-    
+
     {"build":[
-        
+
         {"src":[
              "!tpl:umd-header-single.tpl.js"
             ,"./src/header.js"
@@ -27,9 +28,9 @@
             ,"./src/jquery.modelview.js"
             ,"!tpl:umd-footer.tpl.js"
         ]},
-        
+
         {"header": "./src/header.js"},
-        
+
         {"replace":[
              {"@@ROOT@@": "this"}
             ,{"@@EXPORTS@@": "exports"}
@@ -37,36 +38,42 @@
             ,{"@@VERSION@@": "0.51"}
             ,{"@@DATE@@": "Xpresion::date(\"Y-m-d H:i:s\")"}
         ]},
-        
+
+        {"inc":{
+             "prefix": "/*"
+            ,"suffix": "*/"
+            ,"define": "foo,bar"
+        }},
+
         {"process-shell":[
              "echo ^/^*^*[DOC_MARKDOWN] >> ${IN}"
             ,"echo documentation >> ${IN}"
             ,"echo [/DOC_MARKDOWN]^*^*^/ >> ${IN}"
             ,"type ${IN} > ${OUT}"
         ]},
-        
+
         {"doc":{
              "startdoc": "/**[DOC_MARKDOWN]"
             ,"enddoc": "[/DOC_MARKDOWN]**/"
             ,"trim": "RegExp::^\\s*\\*[ ]?"
             ,"output": "./test-doc.md"
         }},
-        
+
         {"process-shell":[
              "echo ^/^/ postprocessed >> ${IN}"
             ,"echo ^/^/ postprocessed2 >> ${IN}"
             ,"type ${IN} > ${OUT}"
         ]},
-        
+
         {"out": "./build/modelview.js"}
     ]},
-    
+
     {"minify":[
-        
+
         {"src":[
             "./build/modelview.js"
         ]},
-        
+
         {"minify":{
              "uglifyjs":[
                 "-m -c"
@@ -78,13 +85,13 @@
                 "--preserve-semi"
             ]
         }},
-        
+
         {"process-shell":[
              "echo ^/^/ postprocessed >> ${IN}"
             ,"echo ^/^/ postprocessed2 >> ${IN}"
             ,"type ${IN} > ${OUT}"
         ]},
-        
+
         {"out": "./build/modelview.min.js"}
     ]}
 ]
