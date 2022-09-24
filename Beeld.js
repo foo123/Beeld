@@ -4,15 +4,15 @@
 *   Beeld
 *   https://github.com/foo123/Beeld
 *
-*   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-*   @version: 1.0.2
+*   A scriptable, extendable and configurable source code builder framework in PHP, Python, JavaScript
+*   @version: 1.0.3
 *
 **/
 !function (root, name, factory) {
     // node, CommonJS, etc..
-    if ( 'object' == typeof(module) && module.exports ) module.exports = factory();
-    else if ( !(name in root) ) root[name] = factory();
-}('undefined' !== typeof self ? self : this, 'Beeld', function( undef ) {
+    if ('object' == typeof(module) && module.exports) module.exports = factory();
+    else if (!(name in root)) root[name] = factory();
+}('undefined' !== typeof self ? self : this, 'Beeld', function(undef) {
 "use strict";
 var PROTO = 'prototype', HAS = Object.prototype.hasOwnProperty,
     // basic modules
@@ -23,15 +23,15 @@ var PROTO = 'prototype', HAS = Object.prototype.hasOwnProperty,
 
     // auxilliary methods
     startsWith = String[PROTO].startsWith
-            ? function( s, pre, pos ){return s.startsWith(pre, pos||0);}
-            : function( s, pre, pos ){pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
+            ? function(s, pre, pos) {return s.startsWith(pre, pos||0);}
+            : function(s, pre, pos) {pos=pos||0; return pre === s.substr(pos, pre.length+pos);},
 
     keys = Object.keys,
-    extend = function( o1, o2 ) {
+    extend = function(o1, o2) {
         o1 = o1 || {};
         for (var p in o1)
         {
-            if ( HAS.call(o2,p) && HAS.call(o1,p) && undef !== o2[p] )
+            if (HAS.call(o2,p) && HAS.call(o1,p) && undef !== o2[p])
                 o1[p] = o2[p];
         }
         return o1;
@@ -52,65 +52,71 @@ var PROTO = 'prototype', HAS = Object.prototype.hasOwnProperty,
       return path.join(options.dir || path.resolve(os.tmpdir()), name);
     },
 
-    tmpfile = function( ) {
-        return generateName( {suffix: '.tmpnode'} );
+    tmpfile = function() {
+        return generateName({suffix: '.tmpnode'});
     },
 
-    read = function( file, enc ) {
+    read = function(file, enc) {
         var buf = "";
-        if ( file && fs.existsSync( file ) )
+        if (file && fs.existsSync(file))
         {
-            try { buf = fs.readFileSync(file, {encoding: enc||'utf8'}).toString( );  }
-            catch (e) { buf = ""; }
+            try {
+                buf = fs.readFileSync(file, {encoding: enc||'utf8'}).toString();
+            } catch (e) {
+                buf = "";
+            }
         }
         return buf;
     },
 
-    read_async = function( file, enc, cb ) {
+    read_async = function(file, enc, cb) {
         /*fs.stat(file, function(err, stat){
             if ( !err && stat )
             {*/
                 fs.readFile(file, {encoding: enc||'utf8'}, function(err,data){
-                    if ( cb ) cb( err, err ? '' : data.toString() );
+                    if (cb) cb(err, err ? '' : data.toString());
                 });
             /*}
-            else if ( cb )
+            else if (cb)
             {
-                cb( '' );
+                cb('');
             }
         });*/
     },
 
-    write = function( file, text, enc ) {
+    write = function(file, text, enc) {
         var res = null;
-        try { res = fs.writeFileSync(file, text.toString(), {encoding: enc||'utf8'});  }
-        catch (e) { }
+        try {
+            res = fs.writeFileSync(file, text.toString(), {encoding: enc||'utf8'});
+        } catch (e) {
+            // pass
+        }
         return res;
     },
 
-    write_async = function( file, text, enc, cb ) {
-        fs.writeFile(file, text.toString(), {encoding: enc||'utf8'}, function(err){
-            if ( cb ) cb( err );
-        });
+    write_async = function(file, text, enc, cb) {
+        fs.writeFile(file, text.toString(), {encoding: enc||'utf8'}, function(err) {if (cb) cb(err);});
     },
 
-    unlink_async = function( file ) {
-        if ( file )
+    unlink_async = function(file) {
+        if (file)
         {
-            /*fs.exists(file, function(yes){ if ( yes )*/ fs.unlink(file, function(err){ }); /*});*/
+            /*fs.exists(file, function(yes){ if ( yes )*/ fs.unlink(file, function(err) {}); /*});*/
         }
     },
 
-    cleanup = function( files ) {
+    cleanup = function(files) {
         var i, l = files.length;
-        for (i=0; i<l; i++) unlink_async( files[i] );
+        for (i=0; i<l; ++i) unlink_async(files[i]);
     },
 
-    file_ext = function( fileName ) { return path.extname(fileName).toString( ); },
+    file_ext = function(fileName) {
+        return path.extname(fileName).toString();
+    },
 
     // needed variables
     BEELD_FILE, BEELD_ROOT, BEELD_INCLUDES, BEELD_PARSERS, BEELD_TEMPLATES, BEELD_PLUGINS,
-    TPLS = { }, PublishSubscribe, Xpresion, Contemplate, /*List, Map,*/ OrderedMap,
+    TPLS = {}, PublishSubscribe, Xpresion, Contemplate, /*List, Map,*/ OrderedMap,
     BeeldParser, BeeldCompiler, Beeld
 ;
 
@@ -127,7 +133,7 @@ Xpresion = require(BEELD_INCLUDES + 'Xpresion.js');
 
 //List = Array;
 //Map = Object;
-OrderedMap = function( om ) {
+OrderedMap = function(om) {
     this.om = om;
     this.index = 0;
 };
@@ -136,13 +142,13 @@ OrderedMap[PROTO] = {
     om: null,
     index: 0,
 
-    hasNext: function( ) {
+    hasNext: function() {
         return this.index < this.om.length;
     },
-    getNext: function( raw ) {
+    getNext: function(raw) {
         if (this.index < this.om.length)
         {
-            if ( true === raw )
+            if (true === raw)
             {
                 return this.om[this.index++];
             }
@@ -154,19 +160,19 @@ OrderedMap[PROTO] = {
         }
         return null;
     },
-    hasItem: function( index ) {
+    hasItem: function(index) {
         return (index >= 0 && index < this.om.length);
     },
-    hasItemByKey: function( key ) {
+    hasItemByKey: function(key) {
         var om = this.om, i, l = om.length;
-        for (i=0; i<l; i++)
+        for (i=0; i<l; ++i)
         {
             if (om[i] && HAS.call(om[i],key))
                 return i;
         }
         return -1;
     },
-    getItem: function( index ) {
+    getItem: function(index) {
         if (index >= 0 && index < this.om.length)
         {
             var obj = this.om[index], key = keys(obj)[0];
@@ -174,32 +180,32 @@ OrderedMap[PROTO] = {
         }
         return null;
     },
-    getItemByKey: function( key ) {
+    getItemByKey: function(key) {
         var om = this.om, i, l = om.length;
-        for (i=0; i<l; i++)
+        for (i=0; i<l; ++i)
         {
             if (om[i] && HAS.call(om[i],key))
                 return [key, om[i][key]];
         }
         return null;
     },
-    rewind: function( ) {
+    rewind: function() {
         this.index = 0;
         return this;
     }
 };
 
-function multi_replace( tpl, reps )
+function multi_replace(tpl, reps)
 {
     var out = tpl, i=0, l=reps.length;
-    for (i=0; i<l; i++)
+    for (i=0; i<l; ++i)
     {
         out = out.split(reps[i][0]).join(reps[i][1]);
     }
     return out;
 }
 
-function regex( rex, evt )
+function regex(rex, evt)
 {
     var settings = evt.data.config.settings;
     if (rex instanceof RegExp) return rex;
@@ -207,19 +213,19 @@ function regex( rex, evt )
     return false;
 }
 
-function xpresion( xpr, evt )
+function xpresion(xpr, evt)
 {
     var settings = evt.data.config.settings;
-    if ( settings.Xpresion )
+    if (settings.Xpresion)
     {
-        if ( xpr instanceof Xpresion )
+        if (xpr instanceof Xpresion)
         {
             return xpr;
         }
-        else if ( xpr.substr && startsWith(xpr, settings.Xpresion) )
+        else if (xpr.substr && startsWith(xpr, settings.Xpresion))
         {
             try {
-                xpr = new Xpresion( xpr.substr(settings.Xpresion.length) );
+                xpr = new Xpresion(xpr.substr(settings.Xpresion.length));
             } catch (e) {
                 xpr = null;
             }
@@ -229,7 +235,7 @@ function xpresion( xpr, evt )
     return xpr;
 }
 
-function evaluate( xpr, data )
+function evaluate(xpr, data)
 {
     return xpr instanceof Xpresion ? xpr.evaluate(data) : String(xpr);
 }
@@ -237,7 +243,7 @@ function evaluate( xpr, data )
 //
 // adapted from node-commander package
 // https://github.com/visionmedia/commander.js/
-function parse_args( args )
+function parse_args(args)
 {
     var
         Flags = {}, Options = {},  Params = [],
@@ -252,9 +258,9 @@ function parse_args( args )
     for (i = 0, len = args.length; i < len; ++i)
     {
         arg = args[i];
-        if (arg.length > 1 && '-' == arg[0] && '-' != arg[1])
+        if (arg.length > 1 && '-' === arg[0] && '-' !== arg[1])
         {
-            arg.slice(1).split('').forEach(function(c){
+            arg.slice(1).split('').forEach(function(c) {
                 Flags[c] = true;
             });
             argumentforoption = false;
@@ -293,7 +299,7 @@ function parse_args( args )
     return {flags: Flags, options: Options, params: Params};
 }
 
-function show_help_msg( )
+function show_help_msg()
 {
     echo ("usage: "+BEELD_FILE+" [-h] [--config FILE] [--tasks TASKS] [--enc ENCODING]");
     echo (" ");
@@ -311,35 +317,35 @@ function show_help_msg( )
     echo (" ");
 }
 
-function parse_options( defaults, required, on_error )
+function parse_options(defaults, required, on_error)
 {
     // parse args
     var options, parsedargs, is_valid, i, opt;
 
-    parsedargs = parse_args( process.argv );
+    parsedargs = parse_args(process.argv);
     options = parsedargs.options;
-    if ( defaults )
+    if (defaults)
     {
         for (opt in defaults)
         {
-            if ( !HAS.call(defaults,opt) ) continue;
-            if ( !HAS.call(options,opt) ) options[opt] = defaults[opt];
+            if (!HAS.call(defaults, opt)) continue;
+            if (!HAS.call(options, opt)) options[opt] = defaults[opt];
         }
     }
 
     is_valid = true;
 
     // if help is set, or no dependencis file, echo help message and exit
-    if ( parsedargs.flags['h'] || options['help'] )
+    if (parsedargs.flags['h'] || options['help'])
     {
         is_valid = false;
     }
-    else if ( required )
+    else if (required)
     {
-        for(i=0; i<required.length; i++)
+        for(i=0; i<required.length; ++i)
         {
             opt = required[i];
-            if ( !HAS.call(options,opt) || !options[opt] || !options[opt].length )
+            if (!HAS.call(options, opt) || !options[opt] || !options[opt].length)
             {
                 is_valid = false;
                 break;
@@ -347,7 +353,7 @@ function parse_options( defaults, required, on_error )
         }
     }
 
-    if ( !is_valid )
+    if (!is_valid)
     {
         on_error();
         exit(1);
@@ -356,15 +362,15 @@ function parse_options( defaults, required, on_error )
     return options;
 }
 
-function get_tpl( id, enc, cb )
+function get_tpl(id, enc, cb)
 {
     var tpl, tpl_id = 'tpl_'+id;
-    if ( 'function' === typeof cb )
+    if ('function' === typeof cb)
     {
-        if ( !HAS.call(TPLS,tpl_id) )
+        if (!HAS.call(TPLS, tpl_id))
         {
-            read_async(BEELD_TEMPLATES + id, enc, function(err,data){
-                if ( !err ) TPLS[tpl_id] = ''+data;
+            read_async(BEELD_TEMPLATES + id, enc, function(err,data) {
+                if (!err) TPLS[tpl_id] = ''+data;
                 cb(err, data);
             });
         }
@@ -376,14 +382,14 @@ function get_tpl( id, enc, cb )
     }
     else
     {
-        if ( !HAS.call(TPLS,tpl_id) ) TPLS[tpl_id] = read( BEELD_TEMPLATES + id, enc );
+        if (!HAS.call(TPLS,tpl_id)) TPLS[tpl_id] = read(BEELD_TEMPLATES + id, enc);
         tpl = TPLS[tpl_id];
-        return tpl.slice( );
+        return tpl.slice();
     }
 }
 
 
-function get_real_path( file, basePath )
+function get_real_path(file, basePath)
 {
     basePath = basePath || '';
     if (
@@ -394,9 +400,9 @@ function get_real_path( file, basePath )
     else return file;
 }
 
-function read_file( filename, basePath )
+function read_file(filename, basePath)
 {
-    return read( get_real_path( filename, basePath ) );
+    return read(get_real_path(filename, basePath));
 }
 
 BeeldParser = function(path, class_name, name) {
@@ -419,7 +425,7 @@ BeeldParser[PROTO] = {
     parser: null,
     //parse_method: null,
 
-    dispose: function( ) {
+    dispose: function() {
         var self = this;
         self.class_name = null;
         self.name = null;
@@ -431,19 +437,19 @@ BeeldParser[PROTO] = {
         return self;
     },
 
-    load: function( ) {
-        return require( this.path );
+    load: function() {
+        return require(this.path);
     },
 
-    parse: function( text ) {
+    parse: function(text) {
         var self = this;
-        if ( !self.parser )
-            self.parser = self.load( );
-        return self.parser.parse( text );
+        if (!self.parser)
+            self.parser = self.load();
+        return self.parser.parse(text);
     }
 };
 
-BeeldCompiler = function( name, cmd, options ) {
+BeeldCompiler = function(name, cmd, options) {
     var self = this;
     self.name = name;
     self.cmd_tpl = cmd;
@@ -455,7 +461,7 @@ BeeldCompiler[PROTO] = {
     cmd_tpl: null,
     options: null,
 
-    dispose: function( ) {
+    dispose: function() {
         var self = this;
         self.name = null;
         self.cmd_tpl = null;
@@ -463,11 +469,11 @@ BeeldCompiler[PROTO] = {
         return this;
     },
 
-    compiler: function( args ) {
+    compiler: function(args) {
         return multi_replace(this.cmd_tpl, args||[]);
     },
 
-    option: function( opt ) {
+    option: function(opt) {
         opt = String(opt);
         var self = this, p = (self.options.length && opt.length) ? " " : "";
         self.options += p + opt;
@@ -475,10 +481,10 @@ BeeldCompiler[PROTO] = {
     }
 };
 
-Beeld = function Beeld( ) {
+Beeld = function Beeld() {
     var self = this;
 
-    self.initPubSub( );
+    self.initPubSub();
 
     self.actions = {
      'action_src': Beeld.Actions.action_src
@@ -489,7 +495,7 @@ Beeld = function Beeld( ) {
     ,'action_out': Beeld.Actions.action_out
     };
 };
-Beeld.VERSION = "1.0.2";
+Beeld.VERSION = "1.0.3";
 Beeld.FILE      = BEELD_FILE;
 Beeld.ROOT      = BEELD_ROOT;
 Beeld.INCLUDES  = BEELD_INCLUDES;
@@ -497,15 +503,15 @@ Beeld.PARSERS   = BEELD_PARSERS;
 Beeld.TEMPLATES = BEELD_TEMPLATES;
 Beeld.PLUGINS   = BEELD_PLUGINS;
 
-Beeld.OrderedMap = function( om ){
+Beeld.OrderedMap = function(om) {
     return new OrderedMap(om);
 };
 
-Beeld.Parser = function( path, class_name, name ){
+Beeld.Parser = function(path, class_name, name) {
     return new BeeldParser(path, class_name, name);
 };
 
-Beeld.Compiler = function( name, cmd, options ){
+Beeld.Compiler = function(name, cmd, options) {
     return new BeeldCompiler(name, cmd, options);
 };
 
@@ -563,14 +569,14 @@ Xpresion.defaultConfiguration().defFunc({
 // Beeld default actions
 Beeld.Actions = {
 
- abort: function( evt, params ) {
-    if ( evt && !params) params = evt.data;
+ abort: function(evt, params) {
+    if (evt && !params) params = evt.data;
     var config = params.config,
         options = params.options,
         data = params.data,
         current = params.current;
     cleanup([data.tmp_in, data.tmp_out]);
-    if ( data.err ) echoStdErr( data.err );
+    if (data.err) echoStdErr(data.err);
     current.dispose();
     data.dispose();
     options.dispose();
@@ -578,17 +584,17 @@ Beeld.Actions = {
     params.data = null;
     params.config = null;
     params.options = null;
-    if ( evt ) evt.dispose();
-    exit( 1 );
+    if (evt) evt.dispose();
+    exit(1);
 }
-,log: function( evt ) {
+,log: function(evt) {
     var params = evt.data,
         options = params.options,
         data = params.data,
         current = params.current,
         sepLine = new Array(66).join("=");
     // output the build settings
-    if ( !options.outputToStdOut )
+    if (!options.outputToStdOut)
     {
         echo (sepLine);
         echo ("Build Package");
@@ -600,9 +606,9 @@ Beeld.Actions = {
         echo ("Output   : " + options.out);
         echo (" ");
     }
-    evt.next( );
+    evt.next();
 }
-,finish: function( evt ) {
+,finish: function(evt) {
     var params = evt.data,
         options = params.options,
         data = params.data,
@@ -618,19 +624,19 @@ Beeld.Actions = {
     params.options = null;
     evt.dispose();
 }
-,next_action: function( evt ) {
+,next_action: function(evt) {
     var params = evt.data,
         current = params.current,
         task_actions = current.task_actions;
-    if ( task_actions && task_actions.hasNext() )
+    if (task_actions && task_actions.hasNext())
     {
         var a = task_actions.getNext(),
             action = 'action_' + a[0];
-        if ( HAS.call(current.actions,action) )
+        if (HAS.call(current.actions,action))
         {
             current.action = a[0];
             current.action_cfg = a[1];
-            current.actions[ action ]( evt );
+            current.actions[action](evt);
         }
         else
         {
@@ -642,7 +648,7 @@ Beeld.Actions = {
         evt.next();
     }
 }
-,next_task: function next_task( evt ) {
+,next_task: function next_task(evt) {
     var params = evt.data,
         options = params.options,
         data = params.data,
@@ -650,7 +656,7 @@ Beeld.Actions = {
         current_tasks = current.tasks,
         pipeline = params.pipeline
         ;
-    if ( current_tasks && current_tasks.hasNext() )
+    if (current_tasks && current_tasks.hasNext())
     {
         var task = current_tasks.getNext();
 
@@ -665,7 +671,7 @@ Beeld.Actions = {
         data.err = false;
 
         var out = current.task_actions.getItemByKey('out');
-        if ( out )
+        if (out)
         {
             options.out = get_real_path(out[1], options.basePath);
             options.outputToStdOut = false;
@@ -679,7 +685,7 @@ Beeld.Actions = {
         // default header action
         // is first file of src if exists
         var src_action = current.task_actions.hasItemByKey('src');
-        if ( !current.task_actions.getItemByKey('header') && (-1 < src_action) )
+        if (!current.task_actions.getItemByKey('header') && (-1 < src_action))
         {
             var src_cfg = current.task_actions.getItemByKey('src');
             current.task_actions.om.splice(src_action+1, 0, {'header':src_cfg[1][0]});
@@ -704,20 +710,20 @@ Beeld.Actions = {
             pipeline.on('#actions', Beeld.Actions.finish);
         }*/
 
-        evt.next( );
+        evt.next();
     }
     else
     {
-        //Beeld.Actions.finish( evt );
-        evt.next( );
+        //Beeld.Actions.finish(evt);
+        evt.next();
     }
 }
 
-/* action_initially: function( evt ) {
-    evt.next( );
+/* action_initially: function(evt) {
+    evt.next();
 }*/
 
-,action_src: function( evt ) {
+,action_src: function(evt) {
     var params = evt.data,
         options = params.options,
         data = params.data,
@@ -727,10 +733,10 @@ Beeld.Actions = {
 
     data.src = '';
 
-    if ( current.action_cfg )
+    if (current.action_cfg)
     {
         // make it array
-        srcFiles = [].concat( current.action_cfg||[] );
+        srcFiles = [].concat(current.action_cfg||[]);
         count = srcFiles.length;
     }
     else
@@ -743,43 +749,43 @@ Beeld.Actions = {
     {
         buffer = [];
         i = 0;
-        var do_next = function do_next(){
-            if ( i >= count )
+        var do_next = function do_next() {
+            if (i >= count)
             {
                 data.src = buffer.join('');
-                evt.next( );
+                evt.next();
             }
             else
             {
                 filename = srcFiles[i++];
-                if ( !filename || !filename.length ) return do_next( );
+                if (!filename || !filename.length) return do_next();
 
-                if ( startsWith(filename, tplid) )
+                if (startsWith(filename, tplid))
                 {
                     // template file
-                    get_tpl( filename.substr(tplidlen), options.encoding, function(err, text){
-                        if ( !err ) buffer.push(text);
+                    get_tpl(filename.substr(tplidlen), options.encoding, function(err, text) {
+                        if (!err) buffer.push(text);
                         do_next();
-                    } );
+                    });
                 }
                 else
                 {
                     // src file
-                    read_async( get_real_path( filename, options.basePath ), options.encoding, function(err, text){
-                        if ( !err ) buffer.push(text);
+                    read_async(get_real_path(filename, options.basePath), options.encoding, function(err, text) {
+                        if (!err) buffer.push(text);
                         do_next();
-                    } );
+                    });
                 }
             }
         };
-        do_next( );
+        do_next();
     }
     else
     {
-        evt.next( );
+        evt.next();
     }
 }
-,action_header: function( evt ) {
+,action_header: function(evt) {
     var params = evt.data,
         options = params.options,
         data = params.data,
@@ -789,52 +795,52 @@ Beeld.Actions = {
 
     data.header = '';
 
-    if ( headerFile && headerFile.length )
+    if (headerFile && headerFile.length)
     {
-        read_async( get_real_path( headerFile, options.basePath ), options.encoding, function(err, text){
-            if ( !err )
+        read_async(get_real_path(headerFile, options.basePath), options.encoding, function(err, text) {
+            if (!err)
             {
                 headerText = text;
-                if ( headerText && headerText.length )
+                if (headerText && headerText.length)
                 {
-                    if ( startsWith(headerText, '/**') )
+                    if (startsWith(headerText, '/**'))
                         data.header = headerText.substr(0, headerText.indexOf("**/")+3);
-                    else if ( startsWith(headerText, '/*!') )
+                    else if (startsWith(headerText, '/*!'))
                         data.header = headerText.substr(0, headerText.indexOf("!*/")+3);
                 }
             }
-            evt.next( );
-        } );
+            evt.next();
+        });
     }
     else
     {
         evt.next( );
     }
 }
-,action_replace: function( evt ) {
+,action_replace: function(evt) {
     var params = evt.data,
         //options = params.options,
         data = params.data,
         current = params.current;
-    if ( current.action_cfg )
+    if (current.action_cfg)
     {
         var replace = Beeld.OrderedMap(current.action_cfg), rep,
             hasHeader = !!(data.header && data.header.length),
             xpresion_data = {}
         ;
         // ordered map
-        while ( replace.hasNext( ) )
+        while (replace.hasNext())
         {
             rep = replace.getNext();
             rep[1] = Beeld.Utils.xpresion(rep[1], evt); // parse xpresion if any
             rep[1] = Beeld.Utils.evaluate(rep[1], xpresion_data);
             data.src = data.src.split(rep[0]).join(rep[1]);
-            if ( hasHeader ) data.header = data.header.split(rep[0]).join(rep[1]);
+            if (hasHeader) data.header = data.header.split(rep[0]).join(rep[1]);
         }
     }
-    evt.next( );
+    evt.next();
 }
-,action_shellprocess: function( evt ) {
+,action_shellprocess: function(evt) {
     var params = evt.data,
         options = params.options,
         data = params.data,
@@ -844,29 +850,29 @@ Beeld.Actions = {
 
     var cmd, i, l, step, process_loop;
 
-    if ( process_list && process_list.length )
+    if (process_list && process_list.length)
     {
         process_list = [].concat(process_list);
         i = 0; l = process_list.length;
         step = 1;
 
-        process_loop = function process_loop( err, file_data ) {
-            if ( err )
+        process_loop = function process_loop(err, file_data) {
+            if (err)
             {
                 data.err = 'Error executing "'+cmd+'"';
-                evt.abort( );
+                evt.abort();
                 return;
             }
-            if ( 1 === step )
+            if (1 === step)
             {
                 step = 2; i = 0;
                 cmd = 'write input file for process_loop';
                 write_async(data.tmp_in, data.src, options.encoding, process_loop);
                 return;
             }
-            if ( 2 === step )
+            if (2 === step)
             {
-                if ( i < l )
+                if (i < l)
                 {
                     cmd = multi_replace(process_list[i], [
                      ['${DIR}',          options.basePath]
@@ -875,7 +881,7 @@ Beeld.Actions = {
                     ,['${IN}',           data.tmp_in]
                     ,['${OUT}',          data.tmp_out]
                     ]);
-                    i+=1;
+                    i += 1;
                     exec_async(cmd, null, process_loop);
                     return;
                 }
@@ -884,7 +890,7 @@ Beeld.Actions = {
                     step = 3;
                 }
             }
-            if ( 3 === step )
+            if (3 === step)
             {
                 step = 4;
                 cmd = 'read output file for process_loop';
@@ -892,16 +898,16 @@ Beeld.Actions = {
                 return;
             }
             data.src = file_data;
-            evt.next( );
+            evt.next();
         };
-        process_loop( null );
+        process_loop(null);
     }
     else
     {
-        evt.next( );
+        evt.next();
     }
 }
-,action_bundle: function( evt ) {
+,action_bundle: function(evt) {
     var params = evt.data,
         options = params.options,
         data = params.data,
@@ -910,10 +916,10 @@ Beeld.Actions = {
 
     data.bundle = '';
 
-    if ( current.action_cfg )
+    if (current.action_cfg)
     {
         // make it array
-        bundleFiles = [].concat( current.action_cfg||[] );
+        bundleFiles = [].concat(current.action_cfg||[]);
         count = bundleFiles.length;
     }
     else
@@ -923,31 +929,31 @@ Beeld.Actions = {
     }
     if (bundleFiles && count)
     {
-        var buffer = [ ], i = 0, filename;
+        var buffer = [], i = 0, filename;
         var do_next = function do_next() {
-            if ( i >= count )
+            if (i >= count)
             {
                 data.bundle = buffer.join("\n") + "\n";
-                evt.next( );
+                evt.next();
             }
             else
             {
                 filename = bundleFiles[i++];
-                if (!filename || !filename.length) return do_next( );
-                read_async( get_real_path( filename, options.basePath ), options.encoding, function(err, text){
-                    if ( !err ) buffer.push(text);
-                    do_next( );
-                } );
+                if (!filename || !filename.length) return do_next();
+                read_async(get_real_path(filename, options.basePath), options.encoding, function(err, text) {
+                    if (!err) buffer.push(text);
+                    do_next();
+                });
             }
         };
-        do_next( );
+        do_next();
     }
     else
     {
-        evt.next( );
+        evt.next();
     }
 }
-,action_out: function( evt ) {
+,action_out: function(evt) {
     var params = evt.data,
         options = params.options,
         data = params.data,
@@ -956,74 +962,76 @@ Beeld.Actions = {
     // write the processed file
     text = data.bundle + data.header + data.src;
     data.bundle=''; data.header=''; data.src='';
-    if ( options.outputToStdOut )
+    if (options.outputToStdOut)
     {
-        echo( text );
-        evt.next( );
+        echo(text);
+        evt.next();
     }
     else
     {
-        write_async( options.out, text, options.encoding, function(){
-            evt.next( );
+        write_async(options.out, text, options.encoding, function() {
+            evt.next();
         });
     }
 }
-/*,action_finally: function( evt ) {
-    evt.next( );
+/*,action_finally: function(evt) {
+    evt.next();
 }*/
 };
 
 
 // extends/implements PublishSubscribe
-Beeld[PROTO] = Object.create( PublishSubscribe[PROTO] );
+Beeld[PROTO] = Object.create(PublishSubscribe[PROTO]);
 
 Beeld[PROTO].constructor = Beeld;
 
 Beeld[PROTO].actions = null;
 
-Beeld[PROTO].dispose = function( ) {
+Beeld[PROTO].dispose = function() {
     var self = this;
-    self.disposePubSub( );
+    self.disposePubSub();
     self.actions = null;
     return self;
 };
 
-Beeld[PROTO].getClass = function( ){ return Beeld; };
+Beeld[PROTO].getClass = function() {
+    return Beeld;
+};
 
-Beeld[PROTO].addAction = function( action, handler ) {
-    if ( action && 'function'===typeof handler )
+Beeld[PROTO].addAction = function(action, handler) {
+    if (action && 'function' === typeof handler)
     {
         this.actions['action_'+action] = handler;
     }
     return this;
 };
 
-Beeld[PROTO].loadPlugins = function( plugins, basePath ) {
+Beeld[PROTO].loadPlugins = function(plugins, basePath) {
     var self = this;
-    if ( plugins && plugins.length )
+    if (plugins && plugins.length)
     {
         var plg, plugin, filename, loader,
             plgid = '!plg:', plgidlen = plgid.length;
         plugins = Beeld.OrderedMap(plugins);
-        while ( plugins.hasNext() )
+        while (plugins.hasNext())
         {
             plg = plugins.getNext();
             filename = plg[1] + '.js';
             // plugins folder file
-            if ( startsWith(filename, plgid) )
+            if (startsWith(filename, plgid))
                 filename = BEELD_PLUGINS + filename.substr(plgidlen);
             else
                 filename = get_real_path(filename, basePath);
-            plugin = require( filename );
-            loader = plugin[ 'beeld_plugin_' + plg[0] ];
-            if ( 'function' === typeof loader ) loader( self );
+            plugin = require(filename);
+            loader = plugin['beeld_plugin_' + plg[0]];
+            if ('function' === typeof loader) loader(self);
         }
     }
     return self;
 };
 
 // parse input arguments, options and configuration settings
-Beeld[PROTO].parse = function( doneCb ) {
+Beeld[PROTO].parse = function(doneCb) {
     var params, config, options,
         configurationFile, configFile, encoding,
         ext, parser, self = this;
@@ -1040,20 +1048,20 @@ Beeld[PROTO].parse = function( doneCb ) {
     //echo(JSON.stringify(options, null, 4));
     //exit(0);
 
-    realpath_async(options.config, function(err, rpath){
-        if ( err ) throw err;
+    realpath_async(options.config, function(err, rpath) {
+        if (err) throw err;
 
         configFile = rpath;
         encoding = options.enc.toLowerCase();
         // parse config settings
         ext = file_ext(configFile).toLowerCase();
-        if ( !ext.length || !HAS.call(Beeld.Parsers,ext) ) ext = "*";
+        if (!ext.length || !HAS.call(Beeld.Parsers,ext)) ext = "*";
         parser = Beeld.Parsers[ext];
-        read_async(configFile, encoding, function(err, data){
-            if ( err ) throw err;
+        read_async(configFile, encoding, function(err, data) {
+            if (err) throw err;
 
             configurationFile = data;
-            config = parser.parse( configurationFile );
+            config = parser.parse(configurationFile);
             config = config||{};
             //echo(JSON.stringify(config, null, 4));
             //exit(0);
@@ -1061,7 +1069,7 @@ Beeld[PROTO].parse = function( doneCb ) {
             'configFile': configFile,
             'inputType': parser.name + ' (' + ext + ')',
             'basePath': dirname(configFile),
-            'cwd': process.cwd( ),
+            'cwd': process.cwd(),
             'encoding': encoding,
             'tasks': options.tasks ? options.tasks.split(',') : false
             });
@@ -1069,26 +1077,26 @@ Beeld[PROTO].parse = function( doneCb ) {
             params.data = Beeld.Obj();
             params.current = Beeld.Obj();
 
-            if ( HAS.call(config,'settings') )
+            if (HAS.call(config, 'settings'))
             {
-                if ( !HAS.call(config['settings'],'RegExp') ) config['settings']['RegExp'] = false;
-                if ( !HAS.call(config['settings'],'Xpresion') ) config['settings']['Xpresion'] = false;
+                if (!HAS.call(config['settings'], 'RegExp')) config['settings']['RegExp'] = false;
+                if (!HAS.call(config['settings'], 'Xpresion')) config['settings']['Xpresion'] = false;
             }
             else
             {
                 config['settings'] = {'RegExp':false, 'Xpresion':false};
             }
-            if ( HAS.call(config,'plugins') )
+            if (HAS.call(config, 'plugins'))
             {
                 self.loadPlugins(config.plugins, params.options.basePath);
             }
             params.config = config;
-            if ( doneCb ) doneCb(params);
+            if (doneCb) doneCb(params);
         });
     });
 };
 
-Beeld[PROTO].build = function( params ) {
+Beeld[PROTO].build = function(params) {
     var self = this,
         tasks = [],
         selected_tasks = null,
@@ -1097,34 +1105,34 @@ Beeld[PROTO].build = function( params ) {
     params.data.tmp_in = null;
     params.data.tmp_out = null;
 
-    if ( HAS.call(params.config,'tasks') )
+    if (HAS.call(params.config, 'tasks'))
     {
         params.config.tasks = Beeld.OrderedMap(params.config.tasks);
         while (params.config.tasks.hasNext())
         {
             task = params.config.tasks.getNext(true); task_name = keys(task)[0];
-            tasks.push( task );
-            if ( params.options.tasks && -1 < params.options.tasks.indexOf(task_name) )
+            tasks.push(task);
+            if (params.options.tasks && -1 < params.options.tasks.indexOf(task_name))
             {
                 selected_tasks = selected_tasks || [];
-                selected_tasks.push( task );
+                selected_tasks.push(task);
             }
         }
     }
-    if ( !selected_tasks )
+    if (!selected_tasks)
     {
-        if ( false === params.options.tasks )
+        if (false === params.options.tasks)
         {
-            if ( tasks.length )
+            if (tasks.length)
                 selected_tasks = tasks;
             /*else if ( params.config )
                 selected_tasks = [['default', params.config]];*/
         }
     }
-    if ( !selected_tasks )
+    if (!selected_tasks)
     {
         params.data.err = 'Task is not defined';
-        Beeld.Actions.abort( null, params );
+        Beeld.Actions.abort(null, params);
     }
 
     params.pipeline = self;
@@ -1138,10 +1146,10 @@ Beeld[PROTO].build = function( params ) {
     params.data.header = '';
     params.data.bundle = '';
     params.data.err = false;
-    params.data.tmp_in = tmpfile( );
-    params.data.tmp_out = tmpfile( );
+    params.data.tmp_in = tmpfile();
+    params.data.tmp_out = tmpfile();
 
-    while ( params.current.tasks && params.current.tasks.hasNext() )
+    while (params.current.tasks && params.current.tasks.hasNext())
     {
         var task = params.current.tasks.getNext();
         self.on('#actions', Beeld.Actions.next_task);
@@ -1150,11 +1158,11 @@ Beeld[PROTO].build = function( params ) {
         // default header action
         // is first file of src if exists
         var src_action = task_actions.hasItemByKey('src');
-        if ( !task_actions.getItemByKey('header') && (-1 < src_action) )
+        if (!task_actions.getItemByKey('header') && (-1 < src_action))
         {
             self.on('#actions', Beeld.Actions.next_action);
         }
-        while ( task_actions && task_actions.hasNext() )
+        while (task_actions && task_actions.hasNext())
         {
             var action = task_actions.getNext();
             self.on('#actions', Beeld.Actions.next_action);
@@ -1166,19 +1174,19 @@ Beeld[PROTO].build = function( params ) {
     return self;
 };
 
-Beeld.Main = function( ) {
-    var builder = new Beeld( );
+Beeld.Main = function() {
+    var builder = new Beeld();
     // do the process
-    builder.parse(function(params){
-       builder.build( params );
+    builder.parse(function(params) {
+       builder.build(params);
     });
 };
 
 // if called from command-line
-if ( require && require.main === module )
+if (require && require.main === module)
 {
     // do the process
-    Beeld.Main( );
+    Beeld.Main();
 }
 
 // export it

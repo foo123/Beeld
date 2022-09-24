@@ -4,8 +4,8 @@
 #   Beeld
 #   https://github.com/foo123/Beeld
 #
-#   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-#   @version: 1.0.2
+#   A scriptable, extendable and configurable source code builder framework in PHP, Python, JavaScript
+#   @version: 1.0.3
 #
 ##
 
@@ -30,7 +30,7 @@ from includes.Xpresion import Xpresion
 
 #
 # beeld utils
-def read(file, enc=None):
+def read(file, enc = None):
     buffer = ''
     if enc: f = open(file, "r", -1, enc)
     else: f = open(file, "r")
@@ -38,7 +38,7 @@ def read(file, enc=None):
     f.close()
     return buffer
 
-def write(file, text, enc=None):
+def write(file, text, enc = None):
     if enc: f = open(file, "w", -1, enc)
     else: f = open(file, "w")
     f.write(text)
@@ -48,12 +48,12 @@ def join_path(*args):
     argslen = len(args)
     DS = os.sep
 
-    if 0==argslen: return "."
+    if 0 == argslen: return "."
 
     path = DS.join(args)
     plen = len(path)
 
-    if 0==plen: return "."
+    if 0 == plen: return "."
 
     isAbsolute    = path[0]
     trailingSlash = path[plen - 1]
@@ -64,22 +64,22 @@ def join_path(*args):
     new_path = []
     up = 0
     i = len(peices)-1
-    while i>=0:
+    while i >= 0:
         last = peices[i]
         if last == "..":
             up = up+1
         elif last != ".":
-            if up>0:  up = up-1
-            else:  new_path.append(peices[i])
-        i = i-1
+            if up > 0:  up = up-1
+            else:       new_path.append(peices[i])
+        i -= 1
 
     path = DS.join(new_path[::-1])
     plen = len(path)
 
-    if 0==plen and 0==len(isAbsolute):
+    if 0 == plen and 0 == len(isAbsolute):
         path = "."
 
-    if 0!=plen and trailingSlash == DS:
+    if 0 != plen and trailingSlash == DS:
         path += DS
 
     if isAbsolute == DS:
@@ -99,7 +99,7 @@ def tmpfile():
     f.close()
     return f.name
 
-def import_path(fullpath='./', doReload=False):
+def import_path(fullpath = './', doReload = False):
     """
     Import a file with full path specification. Allows one to
     import from anywhere, something __import__ does not do.
@@ -121,22 +121,22 @@ def cleanup(files):
                 pass
 
 
-def get_real_path(file, basePath=''):
+def get_real_path(file, basePath = ''):
     if ''!=basePath and (file.startswith('./') or file.startswith('../') or file.startswith('.\\') or file.startswith('..\\')):
         return join_path(basePath, file)
     else:
         return file
 
-def read_file(filename, basePath=''):
-    return read( get_real_path( filename, basePath ) )
+def read_file(filename, basePath = ''):
+    return read(get_real_path(filename, basePath))
 
 
 TPLS = {}
-def get_tpl(id, enc=None):
+def get_tpl(id, enc = None):
     global TPLS
     tpl_id = 'tpl_' + id
     if tpl_id not in TPLS:
-        TPLS[tpl_id] = read( BEELD_TEMPLATES + id, enc )
+        TPLS[tpl_id] = read(BEELD_TEMPLATES + id, enc)
     return str(TPLS[tpl_id])[:]
 
 
@@ -162,7 +162,7 @@ def xpresion(xpr, evt):
             return xpr
         elif isinstance(xpr, str) and xpr.startswith(settings['Xpresion']):
             try:
-                xpr = Xpresion( xpr[len(settings['Xpresion']):] )
+                xpr = Xpresion(xpr[len(settings['Xpresion']):])
             except RuntimeError:
                 xpr = None
             return xpr
@@ -172,7 +172,7 @@ def evaluate(xpr, data):
     return xpr.evaluate(data) if isinstance(xpr, Xpresion) else str(xpr)
 
 
-def parse_options( defaults, required=None ):
+def parse_options(defaults, required = None):
     # parse args
     if ap:
         parser = argparse.ArgumentParser(description="Build Source Code Packages")
@@ -227,14 +227,14 @@ def parse_options( defaults, required=None ):
 #Map = dict
 class OrderedMap:
 
-    def __init__(self, om=None):
+    def __init__(self, om = None):
         self.om = om
         self.index = 0
 
     def hasNext(self):
         return (self.index < len(self.om))
 
-    def getNext(self, raw=False):
+    def getNext(self, raw = False):
         if self.index < len(self.om):
 
             if True == raw:
@@ -249,10 +249,10 @@ class OrderedMap:
 
         return None
 
-    def hasItem(self,index):
+    def hasItem(self, index):
         return (index >= 0 and index < len(self.om))
 
-    def hasItemByKey(self,key):
+    def hasItemByKey(self, key):
         om = self.om
         for i in range(len(om)-1):
             entry = om[i]
@@ -260,7 +260,7 @@ class OrderedMap:
                 return i
         return -1
 
-    def getItem(self,index):
+    def getItem(self, index):
         if index >= 0 and index < len(self.om):
 
             obj = self.om[index]
@@ -269,7 +269,7 @@ class OrderedMap:
 
         return None
 
-    def getItemByKey(self,key):
+    def getItemByKey(self, key):
         om = self.om
         for entry in om:
             if key in entry:
@@ -307,13 +307,13 @@ class BeeldParser:
 
     def parse(self, text):
         if not self.parser:
-            self.parser = self.load( )
-        return self.parser.parse( text )
+            self.parser = self.load()
+        return self.parser.parse(text)
 
 
 class BeeldCompiler:
 
-    def __init__(self, name, cmd, options=''):
+    def __init__(self, name, cmd, options = ''):
         #self.name = None
         #self.cmd_tpl = None
         #self.options = None
@@ -331,11 +331,11 @@ class BeeldCompiler:
         return self
 
 
-    def compiler(self,args=list()):
+    def compiler(self,args = list()):
         return multi_replace(self.cmd_tpl, args)
 
 
-    def option(self,opt):
+    def option(self, opt):
         opt = str(opt)
         p = " " if (len(self.options) and len(opt)) else ""
         self.options += p + opt
@@ -346,14 +346,14 @@ class BeeldCompiler:
 # Beeld default actions
 class BeeldActions:
 
-    def abort(evt, params=None):
-        if evt and None==params: params = evt.data
+    def abort(evt, params = None):
+        if evt and None == params: params = evt.data
         config = params.config
         options = params.options
         data = params.data
         current = params.current
         cleanup([data.tmp_in, data.tmp_out])
-        if data.err: print( data.err )
+        if data.err: print(data.err)
         options.dispose()
         data.dispose()
         current.dispose()
@@ -381,7 +381,7 @@ class BeeldActions:
             print ("Task     : " + current.task)
             print ("Output   : " + options.out)
             print (" ")
-        evt.next( )
+        evt.next()
 
     def finish(evt):
         params = evt.data
@@ -409,7 +409,7 @@ class BeeldActions:
             if action in current.actions:
                 current.action = a[0]
                 current.action_cfg = a[1]
-                current.actions[ action ]( evt )
+                current.actions[action](evt)
 
             else:
                 evt.next()
@@ -469,10 +469,10 @@ class BeeldActions:
             #else:
             #    pipeline.on('#actions', Beeld.Actions.finish)
 
-            evt.next( )
+            evt.next()
         else:
-            #Beeld.Actions.finish( evt )
-            evt.next( )
+            #Beeld.Actions.finish(evt)
+            evt.next()
 
     #def action_initially(evt):
     #    evt.next()
@@ -492,7 +492,7 @@ class BeeldActions:
         else:
             srcFiles = None
 
-        if srcFiles and len(srcFiles)>0:
+        if srcFiles and len(srcFiles) > 0:
             tplid = '!tpl:'
             tplidlen = len(tplid)
             buffer = []
@@ -502,10 +502,10 @@ class BeeldActions:
 
                 if filename.startswith(tplid):
                     # template file
-                    buffer.append( get_tpl( filename[tplidlen:], options.encoding ) )
+                    buffer.append(get_tpl(filename[tplidlen:], options.encoding))
                 else:
                     # src file
-                    buffer.append( read( get_real_path( filename, options.basePath ), options.encoding ) )
+                    buffer.append(read(get_real_path(filename, options.basePath), options.encoding))
             data.src = "".join(buffer)
 
         evt.next()
@@ -521,7 +521,7 @@ class BeeldActions:
         data.header = ''
 
         if headerFile:
-            headerText = read( get_real_path( headerFile, options.basePath ), options.encoding )
+            headerText = read(get_real_path(headerFile, options.basePath), options.encoding)
 
         if headerText and len(headerText):
             if headerText.startswith('/**'):
@@ -541,7 +541,7 @@ class BeeldActions:
         if current.action_cfg:
 
             reple = Beeld.OrderedMap(current.action_cfg)
-            if data.header and len(data.header)>0:
+            if data.header and len(data.header) > 0:
                 hasHeader = True
             else:
                 hasHeader = False
@@ -569,7 +569,7 @@ class BeeldActions:
             params.process_list = process_list
             params.process_list_index = 0
             params.process_list_count = len(params.process_list)
-            write( data.tmp_in, data.src, options.encoding )
+            write(data.tmp_in, data.src, options.encoding)
 
             def process_loop(evt):
                 params = evt.data.data
@@ -594,7 +594,7 @@ class BeeldActions:
                     # high-byte is the exit status
                     if not (type(err) is int): err = 255 & (err[1]>>8)
                     # some error occured
-                    if 0!=err:
+                    if 0 != err:
                         data.err = 'Error executing "'+cmd+'"'
                         params.process_list = None
                         evt.abort()
@@ -603,12 +603,12 @@ class BeeldActions:
                 else:
                     data.src = read(data.tmp_out, options.encoding)
                     params.process_list = None
-                    evt.next( )
+                    evt.next()
 
             process_loop(evt)
 
         else:
-            evt.next( )
+            evt.next()
 
     def action_bundle(evt):
         params = evt.data
@@ -625,12 +625,12 @@ class BeeldActions:
         else:
             bundleFiles = None
 
-        if bundleFiles and len(bundleFiles)>0:
+        if bundleFiles and len(bundleFiles) > 0:
             buffer = []
 
             for filename in bundleFiles:
                 if not len(filename): continue
-                buffer.append( read( get_real_path( filename, options.basePath ), options.encoding ) )
+                buffer.append(read(get_real_path(filename, options.basePath), options.encoding))
 
             data.bundle = "\n".join(buffer) + "\n"
 
@@ -642,13 +642,13 @@ class BeeldActions:
         data = params.data
         #current = params.current
         # write the processed file
-        text = data.bundle+data.header+data.src
+        text = data.bundle + data.header + data.src
         data.bundle = ''
         data.src = ''
         data.header = ''
         if options.outputToStdOut: print (text)
         else: write(options.out, text, options.encoding)
-        evt.next( )
+        evt.next()
 
     #def action_finally(evt):
     #    evt.next()
@@ -698,7 +698,7 @@ Xpresion.defaultConfiguration().defFunc({
 # extends/implements PublishSubscribe
 class Beeld(PublishSubscribe):
 
-    VERSION = "1.0.2"
+    VERSION = "1.0.3"
 
     ROOT      = BEELD_ROOT
     INCLUDES  = BEELD_INCLUDES
@@ -712,10 +712,10 @@ class Beeld(PublishSubscribe):
     def Parser(path, class_name, name):
         return BeeldParser(path, class_name, name)
 
-    def Compiler(name, cmd, options=''):
+    def Compiler(name, cmd, options = ''):
         return BeeldCompiler(name, cmd, options)
 
-    def Obj(props=None):
+    def Obj(props = None):
         return PublishSubscribe.Data(props)
 
     Xpresion = Xpresion
@@ -725,7 +725,7 @@ class Beeld(PublishSubscribe):
 
     def __init__(self):
 
-        self.initPubSub( )
+        self.initPubSub()
 
         self.actions = {
          'action_src': Beeld.Actions.action_src
@@ -740,7 +740,7 @@ class Beeld(PublishSubscribe):
         self.dispose()
 
     def dispose(self):
-        self.disposePubSub( )
+        self.disposePubSub()
         self.actions = None
         return self
 
@@ -763,9 +763,9 @@ class Beeld(PublishSubscribe):
                 if filename.startswith(plgid):
                     filename  = BEELD_PLUGINS + filename[plgidlen:]
                 else:
-                    filename = get_real_path( filename, basePath )
+                    filename = get_real_path(filename, basePath)
                 loader = getattr(import_path(filename), 'beeld_plugin_' + plg[0])
-                if callable(loader): loader( self )
+                if callable(loader): loader(self)
 
         return self
 
@@ -790,7 +790,7 @@ class Beeld(PublishSubscribe):
         configFile = os.path.realpath(options.config)
         encoding = options.enc.lower()
         ext = file_ext(configFile).lower()
-        if (not len(ext)) or (ext not in Beeld.Parsers): ext="*"
+        if (not len(ext)) or (ext not in Beeld.Parsers): ext = "*"
         # parse settings
         parser = Beeld.Parsers[ext]
         configurationFile = read(configFile, encoding)
@@ -835,10 +835,10 @@ class Beeld(PublishSubscribe):
             while params.config['tasks'].hasNext():
                 task = params.config['tasks'].getNext(True)
                 task_name = list(task.keys())[0]
-                tasks.append( task )
+                tasks.append(task)
                 if params.options.tasks and task_name in params.options.tasks:
                     if not selected_tasks: selected_tasks = []
-                    selected_tasks.append( task )
+                    selected_tasks.append(task)
 
         if not selected_tasks:
             if False == params.options.tasks:
@@ -848,7 +848,7 @@ class Beeld(PublishSubscribe):
 
         if not selected_tasks:
             params.data.err = 'Task is not defined'
-            Beeld.Actions.abort( None, params )
+            Beeld.Actions.abort(None, params)
 
         params.pipeline = self
         params.current.tasks = Beeld.OrderedMap(selected_tasks)
@@ -861,8 +861,8 @@ class Beeld(PublishSubscribe):
         params.data.header = ''
         params.data.bundle = ''
         params.data.err = False
-        params.data.tmp_in = tmpfile( )
-        params.data.tmp_out = tmpfile( )
+        params.data.tmp_in = tmpfile()
+        params.data.tmp_out = tmpfile()
 
         while params.current.tasks and params.current.tasks.hasNext():
             task = params.current.tasks.getNext()
@@ -888,7 +888,7 @@ class Beeld(PublishSubscribe):
     def Main():
         # do the process
         builder = Beeld()
-        builder.build( builder.parse() )
+        builder.build(builder.parse())
 
 # if used with 'import *'
 __all__ = ['Beeld']

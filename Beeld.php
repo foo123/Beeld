@@ -5,11 +5,11 @@
 *   Beeld
 *   https://github.com/foo123/Beeld
 *
-*   A scriptable, extendable and configurable source code builder framework in Node/PHP/Python
-*   @version: 1.0.2
+*   A scriptable, extendable and configurable source code builder framework in PHP, Python, JavaScript
+*   @version: 1.0.3
 *
 **/
-if (!class_exists('Beeld'))
+if (!class_exists('Beeld', false))
 {
 
 $BEELD_FILE_INFO = pathinfo(__FILE__);
@@ -31,7 +31,7 @@ final class BeeldUtils
     public static $TPLS = null;
 
     // simulate python's "startswith" string method
-    public static function startsWith($str, $pre, $pos=0)
+    public static function startsWith($str, $pre, $pos = 0)
     {
         return (bool)($pre === substr($str, $pos, strlen($pre)));
     }
@@ -45,21 +45,27 @@ final class BeeldUtils
         return $tmpname;
     }
 
-    public static function read($file, $enc=null)
+    public static function read($file, $enc = null)
     {
         $buf = "";
-        if ( is_file($file) )
+        if (is_file($file))
         {
-            try { $buf = file_get_contents($file); }
-            catch ( Exception $e )  { $buf = ""; }
+            try {
+                $buf = file_get_contents($file);
+            } catch (Exception $e) {
+                $buf = "";
+            }
         }
         return $buf;
     }
 
-    public static function write($file, $text, $enc=null)
+    public static function write($file, $text, $enc = null)
     {
-        try { file_put_contents($file, $text); }
-        catch ( Exception $e ) { }
+        try {
+            file_put_contents($file, $text);
+        } catch (Exception $e) {
+            // pass
+        }
     }
 
     // https://github.com/JosephMoniz/php-path
@@ -84,19 +90,19 @@ final class BeeldUtils
         $new_path = array();
         $up = 0;
         $i = count($peices)-1;
-        while ($i>=0)
+        while ($i >= 0)
         {
             $last = $peices[$i];
-            if ($last == "..")
+            if ($last === "..")
             {
                 $up++;
             }
-            elseif ($last != ".")
+            elseif ($last !== ".")
             {
                 if ($up)  $up--;
                 else  array_push($new_path, $peices[$i]);
             }
-            $i--;
+            --$i;
         }
 
         $path = implode($DS, array_reverse($new_path));
@@ -106,12 +112,12 @@ final class BeeldUtils
             $path = ".";
         }
 
-        if ($path && $trailingSlash == $DS /*"/"*/)
+        if ($path && $trailingSlash === $DS /*"/"*/)
         {
             $path .= $DS /*"/"*/;
         }
 
-        return ($isAbsolute == $DS /*"/"*/ ? $DS /*"/"*/ : "") . $path;
+        return ($isAbsolute === $DS /*"/"*/ ? $DS /*"/"*/ : "") . $path;
     }
 
     public static function file_ext($file)
@@ -124,40 +130,43 @@ final class BeeldUtils
     {
         foreach ((array)$files as $file)
         {
-            if ( $file )
+            if ($file)
             {
                 @fclose($file);
                 try{
                     @unlink($file);
+                } catch (Exception $e {
+                    // pass
                 }
-                catch ( Exception $e) {}
             }
         }
     }
 
-    public static function get_real_path( $file, $basePath='' )
+    public static function get_real_path($file, $basePath = '')
     {
-        if ( is_string($basePath) && strlen($basePath) &&
+        if (
+            is_string($basePath) && strlen($basePath) &&
             (self::startsWith($file, './') ||
                 self::startsWith($file, '../') ||
                 self::startsWith($file, '.\\') ||
-                self::startsWith($file, '..\\'))
+                self::startsWith($file, '..\\')
+            )
         )
             return self::join_path($basePath, $file);
         else return $file;
     }
 
-    public static function get_tpl( $id, $enc=null )
+    public static function get_tpl($id, $enc = null)
     {
         $tpl_id = 'tpl_' . $id;
-        if ( !isset(self::$TPLS[$tpl_id]) )
-            self::$TPLS[$tpl_id] = self::read( BEELD_TEMPLATES . $id );
+        if (!isset(self::$TPLS[$tpl_id]))
+            self::$TPLS[$tpl_id] = self::read(BEELD_TEMPLATES . $id);
         return self::$TPLS[$tpl_id];
     }
 
-    public static function read_file($filename, $basePath='')
+    public static function read_file($filename, $basePath = '')
     {
-        return file_get_contents( self::get_real_path( $filename, $basePath ) );
+        return file_get_contents(self::get_real_path($filename, $basePath));
     }
 
     public static function multi_replace($tpl, $reps)
@@ -174,7 +183,7 @@ final class BeeldUtils
     public static function regex($rex, $evt)
     {
         $settings = $evt->data->config['settings'];
-        if ( $settings['RegExp'] && is_string($rex) && self::startsWith($rex, $settings['RegExp']) )
+        if ($settings['RegExp'] && is_string($rex) && self::startsWith($rex, $settings['RegExp']))
             return '/' . str_replace('/', '\\/', substr($rex, strlen($settings['RegExp']))) . '/';
         return false;
     }
@@ -182,16 +191,16 @@ final class BeeldUtils
     public static function xpresion($xpr, $evt)
     {
         $settings = $evt->data->config['settings'];
-        if ( $settings['Xpresion'] )
+        if ($settings['Xpresion'])
         {
-            if ( $xpr instanceof Xpresion )
+            if ($xpr instanceof Xpresion)
             {
                 return $xpr;
             }
-            else if ( is_string($xpr) && self::startsWith($xpr, $settings['Xpresion']) )
+            else if (is_string($xpr) && self::startsWith($xpr, $settings['Xpresion']))
             {
                 try {
-                    $xpr = new Xpresion( substr($xpr, strlen($settings['Xpresion'])) );
+                    $xpr = new Xpresion(substr($xpr, strlen($settings['Xpresion'])));
                 } catch (\RuntimeException $ex) {
                     $xpr = null;
                 }
@@ -201,7 +210,8 @@ final class BeeldUtils
         return $xpr;
     }
 
-    public static function evaluate($xpr, $data) {
+    public static function evaluate($xpr, $data)
+    {
         return $xpr instanceof Xpresion ? $xpr->evaluate($data) : (string)$xpr;
     }
 
@@ -213,34 +223,61 @@ final class BeeldUtils
     public static function parse_args($argv = null)
     {
         $argv = $argv ? $argv : $_SERVER['argv']; array_shift($argv); $o = array();
-        for ($i = 0, $j = count($argv); $i < $j; $i++)
+        for ($i = 0, $j = count($argv); $i < $j; ++$i)
         {
             $a = $argv[$i];
-            if (substr($a, 0, 2) == '--')
+            if (substr($a, 0, 2) === '--')
             {
                 $eq = strpos($a, '=');
-                if ($eq !== false) {  $o[substr($a, 2, $eq - 2)] = substr($a, $eq + 1); }
+                if ($eq !== false)
+                {
+                    $o[substr($a, 2, $eq - 2)] = substr($a, $eq + 1);
+                }
                 else
                 {
                     $k = substr($a, 2);
-                    if ($i + 1 < $j && $argv[$i + 1][0] !== '-') { $o[$k] = $argv[$i + 1]; $i++; }
-                    else if (!isset($o[$k])) { $o[$k] = true; }
+                    if ($i + 1 < $j && $argv[$i + 1][0] !== '-')
+                    {
+                        $o[$k] = $argv[$i + 1];
+                        ++$i;
+                    }
+                    else if (!isset($o[$k]))
+                    {
+                        $o[$k] = true;
+                    }
                 }
             }
-            else if (substr($a, 0, 1) == '-')
+            else if (substr($a, 0, 1) === '-')
             {
-                if (substr($a, 2, 1) == '=') { $o[substr($a, 1, 1)] = substr($a, 3); }
+                if (substr($a, 2, 1) === '=')
+                {
+                    $o[substr($a, 1, 1)] = substr($a, 3);
+                }
                 else
                 {
-                    foreach (str_split(substr($a, 1)) as $k) { if (!isset($o[$k])) { $o[$k] = true; } }
-                    if ($i + 1 < $j && $argv[$i + 1][0] !== '-') { $o[$k] = $argv[$i + 1]; $i++; }
+                    foreach (str_split(substr($a, 1)) as $k)
+                    {
+                        if (!isset($o[$k]))
+                        {
+                            $o[$k] = true;
+                        }
+                    }
+                    if ($i + 1 < $j && $argv[$i + 1][0] !== '-')
+                    {
+                        $o[$k] = $argv[$i + 1];
+                        ++$i;
+                    }
                 }
             }
-            else { $o[] = $a; } }
+            else
+            {
+                $o[] = $a;
+            }
+        }
         return $o;
     }
 
-    public static function show_help_msg( )
+    public static function show_help_msg()
     {
         self::echo_("usage: ".BEELD_FILE." [-h] [--config FILE] [--tasks TASKS] [--enc ENCODING]");
         self::echo_(" ");
@@ -258,29 +295,29 @@ final class BeeldUtils
         self::echo_(" ");
     }
 
-    public static function parse_options( $defaults, $required, $on_error )
+    public static function parse_options($defaults, $required, $on_error)
     {
-        $options = self::parse_args( $_SERVER['argv'] );
-        if ( !empty($defaults) )
+        $options = self::parse_args($_SERVER['argv']);
+        if (!empty($defaults))
         {
-            foreach((array)$defaults as $opt=>$default)
+            foreach ((array)$defaults as $opt => $default)
             {
-                if ( !isset($options[$opt]) )
+                if (!isset($options[$opt]))
                     $options[$opt] = $default;
             }
         }
 
         $is_valid = true;
 
-        if ( $options['h'] || $options['help'] )
+        if ($options['h'] || $options['help'])
         {
             $is_valid = false;
         }
-        elseif ( !empty($required) )
+        elseif (!empty($required))
         {
             foreach ($required as $opt)
             {
-                if ( !isset($options[$opt]) || empty($options[$opt]) || !$options[$opt] )
+                if (!isset($options[$opt]) || empty($options[$opt]) || !$options[$opt])
                 {
                     $is_valid = false;
                     break;
@@ -288,17 +325,20 @@ final class BeeldUtils
             }
         }
 
-        if ( !$is_valid )
+        if (!$is_valid)
         {
             // If no dependencies have been passed or help is set, show the help message and exit
-            call_user_func( $on_error );
+            call_user_func($on_error);
             exit(1);
             return null;
         }
         return $options;
     }
 
-    public static function echo_($s="") { echo $s . PHP_EOL; }
+    public static function echo_($s = "")
+    {
+        echo $s . PHP_EOL;
+    }
     public static function echo_stderr($msg)
     {
         file_put_contents('php://stderr', $msg);
@@ -314,8 +354,8 @@ BeeldUtils::init();
 final class BeeldOrderedMap
 {
 
-    public $om=null;
-    public $index=0;
+    public $om = null;
+    public $index = 0;
 
     public function __construct($om)
     {
@@ -328,11 +368,11 @@ final class BeeldOrderedMap
         return ($this->index < count($this->om));
     }
 
-    public function getNext($raw=false)
+    public function getNext($raw = false)
     {
         if ($this->index < count($this->om))
         {
-            if ( true === $raw )
+            if (true === $raw)
             {
                 return $this->om[$this->index++];
             }
@@ -356,10 +396,10 @@ final class BeeldOrderedMap
     {
         $om =& $this->om;
         $l = count($om);
-        for ($i=0; $i<$l; $i++)
+        for ($i=0; $i<$l; ++$i)
         {
             $entry = $om[$i];
-            if ( isset($entry[$key]) )
+            if (isset($entry[$key]))
                 return $i;
         }
         return -1;
@@ -380,7 +420,7 @@ final class BeeldOrderedMap
     {
         foreach ($this->om as $entry)
         {
-            if ( isset($entry[$key]) )
+            if (isset($entry[$key]))
                 return array($key, $entry[$key]);
         }
         return null;
@@ -424,15 +464,15 @@ final class BeeldParser
 
     public function parse($text)
     {
-        if ( !class_exists($this->class_name) )
-            $this->load( );
+        if (!class_exists($this->class_name))
+            $this->load();
         return call_user_func(array($this->class_name, 'parse'), $text);
     }
 }
 
 final class BeeldCompiler
 {
-    public function __construct($name, $cmd, $options='')
+    public function __construct($name, $cmd, $options = '')
     {
         $this->name = $name;
         $this->cmd_tpl = $cmd;
@@ -453,7 +493,7 @@ final class BeeldCompiler
     }
 
 
-    public function compiler($args=array())
+    public function compiler($args = array())
     {
         return BeeldUtils::multi_replace($this->cmd_tpl, $args);
     }
@@ -472,15 +512,15 @@ final class BeeldCompiler
 // Beeld default actions
 final class BeeldActions
 {
-    public static function abort($evt, $params=null)
+    public static function abort($evt, $params = null)
     {
-        if ( $evt && null === $params ) $params =& $evt->data;
+        if ($evt && null === $params) $params =& $evt->data;
         //$config =& $params->config;
         $options =& $params->options;
         $data =& $params->data;
         $current =& $params->current;
         BeeldUtils::cleanup(array($data->tmp_in, $data->tmp_out));
-        if ( $data->err ) BeeldUtils::echo_stderr( $data->err );
+        if ($data->err) BeeldUtils::echo_stderr($data->err);
         $options->dispose();
         $data->dispose();
         $current->dispose();
@@ -488,8 +528,8 @@ final class BeeldActions
         $params->options = null;
         $params->data = null;
         $params->current = null;
-        if ( $evt ) $evt->dispose( );
-        exit( 1 );
+        if ($evt) $evt->dispose();
+        exit(1);
     }
 
     public static function process_loop($evt)
@@ -508,18 +548,19 @@ final class BeeldActions
             ,array('${OUT}',        $data->tmp_out)
             ));
             // breaks correct shell scripts
-            //$cmd = escapeshellcmd( $cmd );
+            //$cmd = escapeshellcmd($cmd);
             $params->process_list_index += 1;
 
-            exec($cmd, $out=array(), $err=0);
+            $out = array(); $err = 0;
+            exec($cmd, $out, $err);
 
             // some error occured
-            if ( $err )
+            if ($err)
             {
                 $data->err = 'Error executing "'.$cmd.'"';
                 BeeldUtils::echo_stderr(implode(PHP_EOL, (array)$out));
                 $params->process_list = null;
-                $evt->abort( );
+                $evt->abort();
                 return;
             }
             else self::process_loop($evt);
@@ -540,7 +581,7 @@ final class BeeldActions
         $current =& $params->current;
         $sepLine = str_repeat("=", 65);
         // output the build settings
-        if ( !$options->outputToStdOut )
+        if (!$options->outputToStdOut)
         {
             BeeldUtils::echo_($sepLine);
             BeeldUtils::echo_("Build Package");
@@ -552,7 +593,7 @@ final class BeeldActions
             BeeldUtils::echo_("Output   : " . $options->out);
             BeeldUtils::echo_(" ");
         }
-        $evt->next( );
+        $evt->next();
     }
 
     public static function finish($evt)
@@ -569,7 +610,7 @@ final class BeeldActions
         $params->options = null;
         $params->data = null;
         $params->current = null;
-        $evt->dispose( );
+        $evt->dispose();
     }
 
     public static function next_action($evt)
@@ -577,15 +618,15 @@ final class BeeldActions
         $params =& $evt->data;
         $current =& $params->current;
         $task_actions = $current->task_actions;
-        if ( $task_actions && $task_actions->hasNext() )
+        if ($task_actions && $task_actions->hasNext())
         {
             $a = $task_actions->getNext();
             $action = 'action_' . $a[0];
-            if ( isset($current->actions[$action]) )
+            if (isset($current->actions[$action]))
             {
                 $current->action = $a[0];
                 $current->action_cfg = $a[1];
-                call_user_func($current->actions[ $action ], $evt);
+                call_user_func($current->actions[$action], $evt);
             }
             else
             {
@@ -606,7 +647,7 @@ final class BeeldActions
         $current =& $params->current;
         $current_tasks = $current->tasks;
         $pipeline = $params->pipeline;
-        if ( $current_tasks && $current_tasks->hasNext() )
+        if ($current_tasks && $current_tasks->hasNext())
         {
             $task = $current_tasks->getNext();
 
@@ -621,7 +662,7 @@ final class BeeldActions
             $data->err = false;
 
             $out = $current->task_actions->getItemByKey('out');
-            if ( $out )
+            if ($out)
             {
                 $options->out = BeeldUtils::get_real_path($out[1], $options->basePath);
                 $options->outputToStdOut = false;
@@ -635,7 +676,7 @@ final class BeeldActions
             // default header action
             // is first file of src if exists
             $src_action = $current->task_actions->hasItemByKey('src');
-            if ( !$current->task_actions->getItemByKey('header') && (-1 < $src_action) )
+            if (!$current->task_actions->getItemByKey('header') && (-1 < $src_action))
             {
                 $src_cfg = $current->task_actions->getItemByKey('src');
                 array_splice($current->task_actions->om, $src_action+1, 0, array(array('header'=>$src_cfg[1][0])));
@@ -659,12 +700,12 @@ final class BeeldActions
                 $pipeline->on('#actions', array('BeeldActions','finish'));
             }*/
 
-            $evt->next( );
+            $evt->next();
         }
         else
         {
-            //BeeldActions::finish( $evt );
-            $evt->next( );
+            //BeeldActions::finish($evt);
+            $evt->next();
         }
     }
 
@@ -682,7 +723,7 @@ final class BeeldActions
 
         $data->src = '';
 
-        if ( $current->action_cfg )
+        if ($current->action_cfg)
         {
             $srcFiles = (array)$current->action_cfg;
             $count = count($srcFiles);
@@ -699,18 +740,18 @@ final class BeeldActions
             $tplidlen = strlen($tplid);
             $buffer = array();
 
-            for ($i=0; $i<$count; $i++)
+            for ($i=0; $i<$count; ++$i)
             {
                 $filename = $srcFiles[$i];
 
-                if ( !strlen($filename) ) continue;
+                if (!strlen($filename)) continue;
 
-                if ( BeeldUtils::startsWith($filename, $tplid) )
+                if (BeeldUtils::startsWith($filename, $tplid))
                     // template file
-                    $buffer[] = BeeldUtils::get_tpl( substr($filename, $tplidlen) );
+                    $buffer[] = BeeldUtils::get_tpl(substr($filename, $tplidlen));
                 else
                     // src file
-                    $buffer[] = BeeldUtils::read( BeeldUtils::get_real_path( $filename, $options->basePath ) );
+                    $buffer[] = BeeldUtils::read(BeeldUtils::get_real_path($filename, $options->basePath));
             }
             $data->src = implode('', $buffer);
         }
@@ -728,11 +769,11 @@ final class BeeldActions
         $headerText = null;
         $data->header = '';
 
-        if ( $headerFile )
+        if ($headerFile)
         {
-            $headerText = BeeldUtils::read( BeeldUtils::get_real_path( $headerFile, $options->basePath ) );
+            $headerText = BeeldUtils::read(BeeldUtils::get_real_path($headerFile, $options->basePath));
         }
-        if ( $headerText && !empty($headerText) )
+        if ($headerText && !empty($headerText))
         {
             if (BeeldUtils::startsWith($headerText, '/**'))
             {
@@ -755,7 +796,7 @@ final class BeeldActions
         $data =& $params->data;
         $current =& $params->current;
 
-        if ( $current->action_cfg )
+        if ($current->action_cfg)
         {
             // ordered map
             $replace = Beeld::OrderedMap($current->action_cfg);
@@ -767,7 +808,7 @@ final class BeeldActions
                 $rep[1] = BeeldUtils::xpresion($rep[1], $evt); // parse xpresion if any
                 $rep[1] = BeeldUtils::evaluate($rep[1], $xpresion_data);
                 $data->src = str_replace($rep[0], $rep[1], $data->src);
-                if ( $hasHeader )
+                if ($hasHeader)
                     $data->header = str_replace($rep[0], $rep[1], $data->header);
             }
         }
@@ -778,18 +819,18 @@ final class BeeldActions
     {
         $params =& $evt->data;
         $current =& $params->current;
-        if ( $current->action_cfg )
+        if ($current->action_cfg)
         {
             $data =& $params->data;
             $params->process_list = (array)$current->action_cfg;
             $params->process_list_count = count($params->process_list);
             $params->process_list_index = 0;
-            BeeldUtils::write( $data->tmp_in, $data->src );
-            BeeldActions::process_loop( $evt );
+            BeeldUtils::write($data->tmp_in, $data->src);
+            BeeldActions::process_loop($evt);
         }
         else
         {
-            $evt->next( );
+            $evt->next();
         }
     }
 
@@ -802,7 +843,7 @@ final class BeeldActions
 
         $data->bundle = '';
 
-        if ( $current->action_cfg )
+        if ($current->action_cfg)
         {
             $bundleFiles = (array)$current->action_cfg;
             $count = count($bundleFiles);
@@ -817,10 +858,10 @@ final class BeeldActions
         {
             $buffer = array();
 
-            for ($i=0; $i<$count; $i++)
+            for ($i=0; $i<$count; ++$i)
             {
                 $filename = $bundleFiles[$i];
-                if ( empty($filename) ) continue;
+                if (empty($filename)) continue;
                 $buffer[] = BeeldUtils::read(BeeldUtils::get_real_path($filename, $options->basePath));
             }
             $data->bundle = implode("\n", $buffer) . "\n";
@@ -837,7 +878,7 @@ final class BeeldActions
         // write the processed file
         $text = $data->bundle . $data->header . $data->src;
         $data->bundle=''; $data->header=''; $data->src='';
-        if ( $options->outputToStdOut ) echo ($text);
+        if ($options->outputToStdOut) echo ($text);
         else BeeldUtils::write($options->out, $text);
         $evt->next();
     }
@@ -851,7 +892,7 @@ final class BeeldActions
 // extends/implements PublishSubscribe
 class Beeld extends PublishSubscribe
 {
-    const VERSION = "1.0.2";
+    const VERSION = "1.0.3";
     public static $Parsers = null;
 
     public $actions = null;
@@ -866,12 +907,12 @@ class Beeld extends PublishSubscribe
         return new BeeldParser($path, $class_name, $name);
     }
 
-    public static function Compiler($name, $cmd, $options='')
+    public static function Compiler($name, $cmd, $options = '')
     {
         return new BeeldCompiler($name, $cmd, $options);
     }
 
-    public static function Obj($props=null)
+    public static function Obj($props = null)
     {
         return PublishSubscribe::Data($props);
     }
@@ -881,7 +922,7 @@ class Beeld extends PublishSubscribe
         return new Xpresion($xpr);
     }*/
 
-    public static function init( )
+    public static function init()
     {
         //
         // Beeld default parsers
@@ -918,7 +959,7 @@ class Beeld extends PublishSubscribe
 
     public function __construct()
     {
-        $this->initPubSub( );
+        $this->initPubSub();
 
         $this->actions = array(
          'action_src'=> array('BeeldActions', 'action_src')
@@ -935,20 +976,20 @@ class Beeld extends PublishSubscribe
         $this->dispose();
     }
 
-    public function dispose( )
+    public function dispose()
     {
         $this->disposePubSub();
         $this->actions = null;
     }
 
-    public function getClass( )
+    public function getClass()
     {
         return Beeld; // "Beeld"
     }
 
-    public function addAction( $action, $handler )
+    public function addAction($action, $handler)
     {
-        if ( $action && is_callable($handler) )
+        if ($action && is_callable($handler))
         {
             $this->actions['action_'.$action] = $handler;
         }
@@ -972,14 +1013,14 @@ class Beeld extends PublishSubscribe
                     $filename = BeeldUtils::get_real_path($filename, $basePath);
                 require_once($filename);
                 $loader = 'beeld_plugin_' . $plg[0];
-                if ( is_callable($loader) ) call_user_func( $loader, $this );
+                if (is_callable($loader)) call_user_func($loader, $this);
             }
         }
         return $this;
     }
 
     // parse input arguments, options and configuration settings
-    public function &parse( )
+    public function &parse()
     {
         $params = Beeld::Obj();
         $options = BeeldUtils::parse_options(array(
@@ -998,11 +1039,11 @@ class Beeld extends PublishSubscribe
         $encoding = strtolower($options['enc']);
         // parse settings
         $ext = strtolower(BeeldUtils::file_ext($configFile));
-        if ( !strlen($ext) || !isset(Beeld::$Parsers[$ext]) ) $ext="*";
+        if (!strlen($ext) || !isset(Beeld::$Parsers[$ext])) $ext = "*";
         $parser =& Beeld::$Parsers[$ext];
         $configurationFile = BeeldUtils::read($configFile, $encoding);
         $config = $parser->parse($configurationFile);
-        if ( !$config ) $config = array();
+        if (!$config) $config = array();
         //print_r($config);
         //exit(0);
         $params->options = Beeld::Obj(array(
@@ -1018,16 +1059,16 @@ class Beeld extends PublishSubscribe
         $params->data = Beeld::Obj();
         $params->current = Beeld::Obj();
 
-        if ( isset($config['settings']) )
+        if (isset($config['settings']))
         {
-            if ( !isset($config['settings']['RegExp']) ) $config['settings']['RegExp'] = false;
-            if ( !isset($config['settings']['Xpresion']) ) $config['settings']['Xpresion'] = false;
+            if (!isset($config['settings']['RegExp'])) $config['settings']['RegExp'] = false;
+            if (!isset($config['settings']['Xpresion'])) $config['settings']['Xpresion'] = false;
         }
         else
         {
             $config['settings'] = array('RegExp'=>false, 'Xpresion'=>false);
         }
-        if ( isset($config['plugins']) )
+        if (isset($config['plugins']))
         {
             $this->loadPlugins($config['plugins'], $params->options->basePath);
         }
@@ -1036,7 +1077,7 @@ class Beeld extends PublishSubscribe
         return $params;
     }
 
-    public function build( &$params )
+    public function build(&$params)
     {
         $tasks = array();
         $selected_tasks = null;
@@ -1044,7 +1085,7 @@ class Beeld extends PublishSubscribe
         $params->data->tmp_in = null;
         $params->data->tmp_out = null;
 
-        if ( isset($params->config['tasks']) )
+        if (isset($params->config['tasks']))
         {
             $params->config['tasks'] = Beeld::OrderedMap($params->config['tasks']);
             while ($params->config['tasks']->hasNext())
@@ -1053,27 +1094,27 @@ class Beeld extends PublishSubscribe
                 $task_keys = array_keys($task);
                 $task_name = reset($task_keys);
                 $tasks[] = $task;
-                if ( $params->options->tasks && in_array($task_name, $params->options->tasks) )
+                if ($params->options->tasks && in_array($task_name, $params->options->tasks))
                 {
-                    if ( !$selected_tasks ) $selected_tasks = array();
+                    if (!$selected_tasks) $selected_tasks = array();
                     $selected_tasks[] = $task;
                 }
             }
         }
-        if ( !$selected_tasks )
+        if (!$selected_tasks)
         {
-            if ( false === $params->options->tasks )
+            if (false === $params->options->tasks)
             {
-                if ( !empty($tasks) )
+                if (!empty($tasks))
                     $selected_tasks =& $tasks;
-                /*else if ( $config )
+                /*else if ($config)
                     $selected_tasks = array(array('default', &$config));*/
             }
         }
-        if ( !$selected_tasks )
+        if (!$selected_tasks)
         {
             $params->data->err = 'Task is not defined';
-            BeeldActions::abort( null, $params );
+            BeeldActions::abort(null, $params);
         }
 
         $params->pipeline =& $this;
@@ -1087,10 +1128,10 @@ class Beeld extends PublishSubscribe
         $params->data->header = '';
         $params->data->bundle = '';
         $params->data->err = false;
-        $params->data->tmp_in = BeeldUtils::tmpfile( );
-        $params->data->tmp_out = BeeldUtils::tmpfile( );
+        $params->data->tmp_in = BeeldUtils::tmpfile();
+        $params->data->tmp_out = BeeldUtils::tmpfile();
 
-        while ( $params->current->tasks && $params->current->tasks->hasNext() )
+        while ($params->current->tasks && $params->current->tasks->hasNext())
         {
             $task = $params->current->tasks->getNext();
             $this->on('#actions', array('BeeldActions', 'next_task'));
@@ -1099,11 +1140,11 @@ class Beeld extends PublishSubscribe
             // default header action
             // is first file of src if exists
             $src_action = $task_actions->hasItemByKey('src');
-            if ( !$task_actions->getItemByKey('header') && (-1 < $src_action) )
+            if (!$task_actions->getItemByKey('header') && (-1 < $src_action))
             {
                 $this->on('#actions', array('BeeldActions','next_action'));
             }
-            while ( $task_actions && $task_actions->hasNext() )
+            while ($task_actions && $task_actions->hasNext())
             {
                 $action = $task_actions->getNext();
                 $this->on('#actions', array('BeeldActions','next_action'));
@@ -1119,7 +1160,7 @@ class Beeld extends PublishSubscribe
     {
         // do the process
         $builder = new Beeld();
-        $builder->build( $builder->parse() );
+        $builder->build($builder->parse());
     }
 }
 Beeld::init();
